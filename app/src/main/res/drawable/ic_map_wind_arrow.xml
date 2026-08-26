@@ -1,19 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Placeholder created by WP0. WP7 replaces the path data in place.
-  EXEMPT from the single-path rule (DESIGN §2): 32 x 32 dp, two paths - a white halo drawn first, then the
-  black arrow on top - with hard-coded colours and no runtime tint, because Karoo draws it over map tiles
-  where our day/night ColorProvider never applies.
--->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="32dp"
     android:height="32dp"
     android:viewportWidth="32"
     android:viewportHeight="32">
     <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M16,1L29,29L16,22L3,29Z" />
+        android:pathData="M16,1.2 L23.2,28.6 L20.9,29.9 L16,25.4 L11.1,29.9 L8.8,28.6 Z"
+        android:fillColor="#FFFFFFFF" />
     <path
-        android:fillColor="#FF000000"
-        android:pathData="M16,5L26,26L16,20L6,26Z" />
+        android:pathData="M16,4 L21.5,26.5 L16,21.5 L10.5,26.5 Z"
+        android:fillColor="#FF000000" />
 </vector>

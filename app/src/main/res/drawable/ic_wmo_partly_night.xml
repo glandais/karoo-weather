@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Placeholder created by WP0. WP7 replaces the path data in place. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
     <path
+        android:pathData="M4.6,7.5 A3.4,3.4 0 1,1 11.4,7.5 A3.4,3.4 0 1,1 4.6,7.5 Z M7.9,5.9 A2,2 0 1,1 11.9,5.9 A2,2 0 1,1 7.9,5.9 Z"
         android:fillColor="#FF000000"
-        android:pathData="M12,2C6.477,2 2,6.477 2,12s4.477,10 10,10 10,-4.477 10,-10S17.523,2 12,2z" />
+        android:fillType="evenOdd" />
+    <path
+        android:pathData="M10.68,15.06 H19.32 A1.44,1.44 0 0,1 20.76,16.5 A1.44,1.44 0 0,1 19.32,17.94 H10.68 A1.44,1.44 0 0,1 9.24,16.5 A1.44,1.44 0 0,1 10.68,15.06 Z M9.96,14.34 A2.16,2.16 0 1,1 14.28,14.34 A2.16,2.16 0 1,1 9.96,14.34 Z M12.84,12.9 A2.88,2.88 0 1,1 18.6,12.9 A2.88,2.88 0 1,1 12.84,12.9 Z M17.088,14.7 A1.872,1.872 0 1,1 20.832,14.7 A1.872,1.872 0 1,1 17.088,14.7 Z"
+        android:fillColor="#FF000000" />
 </vector>

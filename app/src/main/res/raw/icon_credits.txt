@@ -1,0 +1,28 @@
+karoo-weather icon credits
+===========================
+
+All 26 vector drawables in app/src/main/res/drawable/ (the 24 dp WMO/utility glyph set, the
+32 dp ic_map_wind_arrow map symbol, and the ic_weather launcher/extension icon) are original
+artwork created for this project by the karoo-weather contributors.
+
+They are not traced or copy-pasted from any third-party icon set. Their silhouettes were
+authored to sit visually in the family established by two well-known open-source icon
+libraries, both permissively licensed and safe to draw stylistic inspiration from:
+
+  * boxicons               https://boxicons.com            MIT License
+  * Material Symbols       https://fonts.google.com/icons  Apache License 2.0
+
+Both libraries were consulted only for their general visual language (filled, rounded,
+bold-stroke weather/utility glyphs that stay legible at small sizes) — no path data was
+copied from either. If any drawable in this set is ever replaced with an unmodified or
+lightly-modified path lifted directly from boxicons or Material Symbols, this file must be
+updated with the specific glyph name, source URL and license for that file.
+
+Icon list (all authored in-house):
+  ic_wmo_clear_day, ic_wmo_clear_night, ic_wmo_partly_day, ic_wmo_partly_night,
+  ic_wmo_cloudy, ic_wmo_fog, ic_wmo_drizzle, ic_wmo_freezing, ic_wmo_rain,
+  ic_wmo_rain_heavy, ic_wmo_showers, ic_wmo_snow, ic_wmo_snow_heavy, ic_wmo_thunder,
+  ic_wmo_thunder_hail, ic_wmo_unknown, ic_wind_arrow, ic_wind_ring, ic_gust, ic_drop,
+  ic_umbrella, ic_thermometer, ic_compass, ic_route, ic_map_wind_arrow, ic_weather
+
+This text is surfaced to riders in Settings -> About (see R.string.icon_credits).
