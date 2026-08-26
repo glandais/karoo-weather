@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  InRideAlert.backgroundColor / textColor are @ColorRes, so the alert palette lives here and only here
+  (DESIGN §1.1). Every other colour is a Wx ColorPair in ui/theme/Tokens.kt.
+-->
+<resources>
+    <color name="alert_bg">#1B4F7A</color>
+    <color name="alert_fg">#FFFFFF</color>
+    <color name="field_fg">#000000</color>
+    <color name="field_bg">#FFFFFF</color>
+</resources>

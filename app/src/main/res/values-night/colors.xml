@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="alert_bg">#0E2C46</color>
+    <color name="alert_fg">#FFFFFF</color>
+    <color name="field_fg">#FFFFFF</color>
+    <color name="field_bg">#000000</color>
+</resources>

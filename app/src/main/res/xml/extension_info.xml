@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ExtensionInfo
+    displayName="@string/extension_name"
+    icon="@drawable/ic_weather"
+    id="karoo-weather"
+    mapLayer="true"
+    scansDevices="false">
+
+    <DataType
+        description="@string/field_weather_now_desc"
+        displayName="@string/field_weather_now"
+        graphical="true"
+        icon="@drawable/ic_weather"
+        typeId="weather-now" />
+
+    <DataType
+        description="@string/field_temperature_desc"
+        displayName="@string/field_temperature"
+        graphical="false"
+        icon="@drawable/ic_thermometer"
+        typeId="temperature" />
+
+    <DataType
+        description="@string/field_wind_desc"
+        displayName="@string/field_wind"
+        graphical="true"
+        icon="@drawable/ic_wind_arrow"
+        typeId="wind" />
+
+    <DataType
+        description="@string/field_rain_desc"
+        displayName="@string/field_rain"
+        graphical="true"
+        icon="@drawable/ic_drop"
+        typeId="rain-next-hour" />
+
+    <DataType
+        description="@string/field_route_forecast_desc"
+        displayName="@string/field_route_forecast"
+        graphical="true"
+        icon="@drawable/ic_route"
+        typeId="route-forecast" />
+</ExtensionInfo>
