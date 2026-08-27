@@ -102,7 +102,7 @@ the file the Karoo extension store polls for updates; override the URLs it point
 ## Release
 
 CI (`.github/workflows/ci.yml`) runs `spotlessCheck`, `testDebugUnitTest`, `lintDebug`,
-`assembleDebug` and `assembleRelease` on every push and pull request to `main`.
+`assembleDebug` and `assembleRelease` on every push and pull request to `develop`.
 
 Pushing a `v<major>.<minor>.<patch>` tag runs `.github/workflows/release.yml`, which builds a signed
 release APK and publishes `app-release.apk` and `manifest.json` as GitHub Release assets — the URLs
