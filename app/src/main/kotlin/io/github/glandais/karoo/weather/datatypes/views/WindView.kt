@@ -80,8 +80,49 @@ fun WindView(
     val headwind =
         bearing?.let { RelativeWind.headwindComponent(relative, sample.windSpeed) } ?: 0.0
     val tint = Wx.forHeadwind(headwind).pick(night)
+    val density = context.resources.displayMetrics.density
     val sizePx = FieldChrome.arrowSizePx(config)
-    val sizeDp = (sizePx / context.resources.displayMetrics.density).roundToInt().coerceAtLeast(16)
+    val sizeDp = (sizePx / density).roundToInt().coerceAtLeast(16)
+
+    val speedStr = units.wind(sample.windSpeed).roundToInt().toString()
+    val unitStr = context.getString(FieldChrome.windUnitLabel(units.wind))
+    val gustStr =
+        "${context.getString(R.string.label_gust_short)} " +
+            "${units.wind(sample.windGusts).roundToInt()}"
+    val originStr =
+        "${context.getString(R.string.label_from)} " +
+            context.getString(FieldChrome.compassLabel(RelativeWind.compassIndex(sample.windDir)))
+
+    // The arrow, the speed and its unit are the field; gust and origin are the annotations, and a
+    // Glance Row that overruns pushes its last run off the panel edge rather than dropping it
+    // (DESIGN 1.3). Shed the origin first, then the gust, until the row measures inside the field.
+    val speedPx = FieldText.widthPx(speedStr, FieldChrome.primarySp(config), density, bold = true)
+    val unitPx = FieldText.widthPx(unitStr, FieldChrome.unitSp(config), density)
+    val gustPx = FieldText.widthPx(gustStr, FieldChrome.secondarySp(config), density)
+    val originPx = FieldText.widthPx(originStr, FieldChrome.unitSp(config), density)
+
+    fun rowFits(withGust: Boolean, withOrigin: Boolean): Boolean {
+        val runs = buildList {
+            add(speedPx)
+            add(unitPx)
+            if (withGust) add(gustPx)
+            if (withOrigin) add(originPx)
+        }
+        val fixedDp =
+            sizeDp +
+                ROW_GAP_DP +
+                UNIT_GAP_DP +
+                (if (withGust) ROW_GAP_DP else 0) +
+                (if (withOrigin) ROW_GAP_DP else 0)
+        return FieldChrome.rowFits(
+            config,
+            density,
+            FieldChrome.rowWidthPx(density, fixedDp, *runs.toIntArray()),
+        )
+    }
+
+    val showOrigin = rowFits(withGust = true, withOrigin = true)
+    val showGust = showOrigin || rowFits(withGust = true, withOrigin = false)
 
     Box(
         modifier = GlanceModifier.fillMaxSize().padding(FieldChrome.paddingDp(config).dp),
@@ -92,34 +133,40 @@ fun WindView(
             WindLayout.STRIP ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ArrowInRing(context, relative, sizePx, sizeDp, tint, arrows)
-                    Spacer(GlanceModifier.width(8.dp))
-                    Speed(context, sample, units, config)
-                    Spacer(GlanceModifier.width(8.dp))
-                    Gust(context, sample, units, config)
-                    Spacer(GlanceModifier.width(8.dp))
-                    Origin(context, sample, config)
+                    Spacer(GlanceModifier.width(ROW_GAP_DP.dp))
+                    Speed(speedStr, unitStr, config)
+                    if (showGust) {
+                        Spacer(GlanceModifier.width(ROW_GAP_DP.dp))
+                        Gust(gustStr, config)
+                    }
+                    if (showOrigin) {
+                        Spacer(GlanceModifier.width(ROW_GAP_DP.dp))
+                        Origin(originStr, config)
+                    }
                 }
             WindLayout.COMPACT ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     ArrowInRing(context, relative, sizePx, sizeDp, tint, arrows)
-                    SpeedValue(sample, units, config)
-                    UnitLabel(context, units, config)
+                    SpeedValue(speedStr, config)
+                    UnitLabel(unitStr, config)
                 }
             WindLayout.WIDE ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ArrowInRing(context, relative, sizePx, sizeDp, tint, arrows)
-                    Spacer(GlanceModifier.width(10.dp))
-                    Speed(context, sample, units, config)
-                    Spacer(GlanceModifier.width(10.dp))
-                    Gust(context, sample, units, config)
+                    Spacer(GlanceModifier.width(ROW_GAP_DP.dp))
+                    Speed(speedStr, unitStr, config)
+                    if (showGust) {
+                        Spacer(GlanceModifier.width(ROW_GAP_DP.dp))
+                        Gust(gustStr, config)
+                    }
                 }
             WindLayout.TALL ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     ArrowInRing(context, relative, sizePx, sizeDp, tint, arrows)
-                    SpeedValue(sample, units, config)
-                    UnitLabel(context, units, config)
-                    Gust(context, sample, units, config)
-                    Origin(context, sample, config)
+                    SpeedValue(speedStr, config)
+                    UnitLabel(unitStr, config)
+                    Gust(gustStr, config)
+                    Origin(originStr, config)
                 }
         }
     }
@@ -159,18 +206,19 @@ private fun ArrowInRing(
 }
 
 @Composable
-private fun Speed(context: Context, sample: WeatherSample, units: Units, config: ViewConfig) {
+private fun Speed(speedStr: String, unitStr: String, config: ViewConfig) {
     Row(verticalAlignment = Alignment.Bottom) {
-        SpeedValue(sample, units, config)
-        Spacer(GlanceModifier.width(3.dp))
-        UnitLabel(context, units, config)
+        SpeedValue(speedStr, config)
+        Spacer(GlanceModifier.width(UNIT_GAP_DP.dp))
+        UnitLabel(unitStr, config)
     }
 }
 
 @Composable
-private fun SpeedValue(sample: WeatherSample, units: Units, config: ViewConfig) {
+private fun SpeedValue(speedStr: String, config: ViewConfig) {
     Text(
-        text = units.wind(sample.windSpeed).roundToInt().toString(),
+        text = speedStr,
+        maxLines = 1,
         style =
             TextStyle(
                 color = GlanceChrome.provider(Wx.fg),
@@ -182,9 +230,10 @@ private fun SpeedValue(sample: WeatherSample, units: Units, config: ViewConfig) 
 }
 
 @Composable
-private fun UnitLabel(context: Context, units: Units, config: ViewConfig) {
+private fun UnitLabel(unitStr: String, config: ViewConfig) {
     Text(
-        text = context.getString(FieldChrome.windUnitLabel(units.wind)),
+        text = unitStr,
+        maxLines = 1,
         style =
             TextStyle(
                 color = GlanceChrome.provider(Wx.fgMuted),
@@ -195,11 +244,10 @@ private fun UnitLabel(context: Context, units: Units, config: ViewConfig) {
 }
 
 @Composable
-private fun Gust(context: Context, sample: WeatherSample, units: Units, config: ViewConfig) {
+private fun Gust(gustStr: String, config: ViewConfig) {
     Text(
-        text =
-            "${context.getString(R.string.label_gust_short)} " +
-                "${units.wind(sample.windGusts).roundToInt()}",
+        text = gustStr,
+        maxLines = 1,
         style =
             TextStyle(
                 color = GlanceChrome.provider(Wx.fgMuted),
@@ -210,12 +258,10 @@ private fun Gust(context: Context, sample: WeatherSample, units: Units, config: 
 }
 
 @Composable
-private fun Origin(context: Context, sample: WeatherSample, config: ViewConfig) {
-    val index = RelativeWind.compassIndex(sample.windDir)
+private fun Origin(originStr: String, config: ViewConfig) {
     Text(
-        text =
-            "${context.getString(R.string.label_from)} " +
-                context.getString(FieldChrome.compassLabel(index)),
+        text = originStr,
+        maxLines = 1,
         style =
             TextStyle(
                 color = GlanceChrome.provider(Wx.fgMuted),
@@ -224,3 +270,9 @@ private fun Origin(context: Context, sample: WeatherSample, config: ViewConfig) 
             ),
     )
 }
+
+/** Gap between the elements of a one-row wind layout, dp. */
+private const val ROW_GAP_DP = 8
+
+/** Gap between the wind value and its unit suffix, dp. */
+private const val UNIT_GAP_DP = 3

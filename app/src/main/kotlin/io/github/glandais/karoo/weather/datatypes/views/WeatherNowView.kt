@@ -80,7 +80,46 @@ fun WeatherNowView(
     stale: Boolean,
 ) {
     val layout = WeatherNowLayout.of(config.gridSize)
-    val iconDp = FieldChrome.iconBoxDp(config, context.resources.displayMetrics.density)
+    val density = context.resources.displayMetrics.density
+    val iconDp = FieldChrome.iconBoxDp(config, density)
+    val arrowDp = windArrowDp(config, density)
+    val tempStr = temperatureText(sample, units, stale)
+    val windStr = units.wind(sample.windSpeed).roundToInt().toString()
+    val unitStr = context.getString(FieldChrome.windUnitLabel(units.wind))
+    // The wind unit is the row's last and least load-bearing run: 11 without a suffix still reads
+    // as a speed, `km/` above `h` reads as a bug. Drop it when the row cannot hold it.
+    val showUnit =
+        when (layout) {
+            WeatherNowLayout.WIDE ->
+                unitFits(
+                    config,
+                    density,
+                    iconDp,
+                    arrowDp,
+                    leadingTextPx =
+                        FieldText.widthPx(
+                            tempStr,
+                            FieldChrome.primarySp(config),
+                            density,
+                            bold = true,
+                        ),
+                    windStr = windStr,
+                    unitStr = unitStr,
+                )
+            WeatherNowLayout.FULL ->
+                unitFits(
+                    config,
+                    density,
+                    iconDp,
+                    arrowDp,
+                    leadingTextPx = leftColumnPx(context, config, density, sample, units, tempStr),
+                    windStr = windStr,
+                    unitStr = unitStr,
+                )
+            // The stacked layouts give the wind cell the whole width; nothing competes with it.
+            WeatherNowLayout.COMPACT,
+            WeatherNowLayout.TALL -> true
+        }
     Box(
         modifier = GlanceModifier.fillMaxSize().padding(FieldChrome.paddingDp(config).dp),
         contentAlignment =
@@ -90,22 +129,44 @@ fun WeatherNowView(
             WeatherNowLayout.COMPACT ->
                 Column(horizontalAlignment = GlanceChrome.horizontal(config.alignment)) {
                     ConditionIcon(sample, iconDp)
-                    Temperature(sample, units, config, stale)
+                    Temperature(tempStr, sample, config, stale)
                 }
             WeatherNowLayout.WIDE ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ConditionIcon(sample, iconDp)
-                    Spacer(GlanceModifier.width(8.dp))
-                    Temperature(sample, units, config, stale)
-                    Spacer(GlanceModifier.width(12.dp))
-                    WindCell(context, sample, units, config, bearing, night, arrows)
+                    Spacer(GlanceModifier.width(WIDE_ICON_GAP_DP.dp))
+                    Temperature(tempStr, sample, config, stale)
+                    Spacer(GlanceModifier.width(WIDE_CELL_GAP_DP.dp))
+                    WindCell(
+                        context,
+                        sample,
+                        config,
+                        bearing,
+                        night,
+                        arrows,
+                        arrowDp,
+                        windStr,
+                        unitStr,
+                        showUnit,
+                    )
                 }
             WeatherNowLayout.TALL ->
                 Column(horizontalAlignment = GlanceChrome.horizontal(config.alignment)) {
                     ConditionIcon(sample, iconDp)
-                    Temperature(sample, units, config, stale)
+                    Temperature(tempStr, sample, config, stale)
                     FeelsLike(context, sample, units, config)
-                    WindCell(context, sample, units, config, bearing, night, arrows)
+                    WindCell(
+                        context,
+                        sample,
+                        config,
+                        bearing,
+                        night,
+                        arrows,
+                        arrowDp,
+                        windStr,
+                        unitStr,
+                        showUnit,
+                    )
                     PrecipProbability(sample, config)
                 }
             WeatherNowLayout.FULL ->
@@ -115,14 +176,25 @@ fun WeatherNowView(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         ConditionIcon(sample, iconDp)
-                        Spacer(GlanceModifier.width(8.dp))
+                        Spacer(GlanceModifier.width(WIDE_ICON_GAP_DP.dp))
                         Column {
-                            Temperature(sample, units, config, stale)
+                            Temperature(tempStr, sample, config, stale)
                             FeelsLike(context, sample, units, config)
                         }
-                        Spacer(GlanceModifier.width(12.dp))
+                        Spacer(GlanceModifier.width(WIDE_CELL_GAP_DP.dp))
                         Column {
-                            WindCell(context, sample, units, config, bearing, night, arrows)
+                            WindCell(
+                                context,
+                                sample,
+                                config,
+                                bearing,
+                                night,
+                                arrows,
+                                arrowDp,
+                                windStr,
+                                unitStr,
+                                showUnit,
+                            )
                             Gust(context, sample, units, config)
                         }
                     }
@@ -143,17 +215,75 @@ private fun ConditionIcon(sample: WeatherSample, iconDp: Int) {
     )
 }
 
-@Composable
-private fun Temperature(
+/** The rendered temperature, built once so the row budget can measure the string it will draw. */
+private fun temperatureText(sample: WeatherSample, units: Units, stale: Boolean): String {
+    val prefix = if (stale) "~" else ""
+    return "$prefix${units.temp(sample.temp).roundToInt()}°"
+}
+
+/**
+ * Arrow box for the inline wind cell, in dp. The cell borrows 60 % of the standalone `wind` field's
+ * arrow so it reads as an annotation of the temperature rather than a second headline.
+ */
+private fun windArrowDp(config: ViewConfig, density: Float): Int {
+    val sizePx = (FieldChrome.arrowSizePx(config) * INLINE_ARROW_SCALE).roundToInt()
+    val safeDensity = if (density > 0f) density else 1f
+    return (sizePx.coerceAtLeast(24) / safeDensity).roundToInt().coerceAtLeast(12)
+}
+
+/** Width in px of the temperature / feels-like column at [WeatherNowLayout.FULL]. */
+private fun leftColumnPx(
+    context: Context,
+    config: ViewConfig,
+    density: Float,
     sample: WeatherSample,
     units: Units,
+    tempStr: String,
+): Int {
+    val tempPx = FieldText.widthPx(tempStr, FieldChrome.primarySp(config), density, bold = true)
+    val feels = sample.apparentTemp ?: return tempPx
+    val feelsStr =
+        "${context.getString(R.string.label_feels_short)} ${units.temp(feels).roundToInt()}°"
+    val feelsPx = FieldText.widthPx(feelsStr, FieldChrome.secondarySp(config), density)
+    return maxOf(tempPx, feelsPx)
+}
+
+/**
+ * Whether the wind cell can still afford its unit suffix.
+ *
+ * @param leadingTextPx text already committed to the row left of the wind value.
+ */
+private fun unitFits(
+    config: ViewConfig,
+    density: Float,
+    iconDp: Int,
+    arrowDp: Int,
+    leadingTextPx: Int,
+    windStr: String,
+    unitStr: String,
+): Boolean {
+    val content =
+        FieldChrome.rowWidthPx(
+            density,
+            iconDp + WIDE_ICON_GAP_DP + WIDE_CELL_GAP_DP + arrowDp + ARROW_GAP_DP + UNIT_GAP_DP,
+            leadingTextPx,
+            FieldText.widthPx(windStr, FieldChrome.secondarySp(config), density),
+            FieldText.widthPx(unitStr, FieldChrome.unitSp(config), density),
+        )
+    return FieldChrome.rowFits(config, density, content)
+}
+
+@Composable
+private fun Temperature(
+    text: String,
+    sample: WeatherSample,
     config: ViewConfig,
     stale: Boolean,
 ) {
-    val prefix = if (stale) "~" else ""
     val colour = if (stale) Wx.fgMuted else Wx.forTemp(sample.temp)
     Text(
-        text = "$prefix${units.temp(sample.temp).roundToInt()}°",
+        text = text,
+        maxLines = 1,
         style =
             TextStyle(
                 color = GlanceChrome.provider(colour),
@@ -176,6 +306,7 @@ private fun FeelsLike(
         text =
             "${context.getString(R.string.label_feels_short)} " +
                 "${units.temp(feels).roundToInt()}°",
+        maxLines = 1,
         style =
             TextStyle(
                 color = GlanceChrome.provider(Wx.fgMuted),
@@ -189,11 +320,14 @@ private fun FeelsLike(
 private fun WindCell(
     context: Context,
     sample: WeatherSample,
-    units: Units,
     config: ViewConfig,
     bearing: Double?,
     night: Boolean,
     arrows: ArrowBitmaps,
+    arrowDp: Int,
+    windStr: String,
+    unitStr: String,
+    showUnit: Boolean,
 ) {
     val relative =
         bearing?.let { RelativeWind.relativeAngle(it, sample.windDir) } ?: sample.windToDir
@@ -204,8 +338,8 @@ private fun WindCell(
     val headwind =
         bearing?.let { RelativeWind.headwindComponent(relative, sample.windSpeed) } ?: 0.0
     val tint = Wx.forHeadwind(headwind).pick(night)
-    val sizePx = (FieldChrome.arrowSizePx(config) * 0.6f).roundToInt().coerceAtLeast(24)
-    val sizeDp = (sizePx / context.resources.displayMetrics.density).roundToInt().coerceAtLeast(12)
+    val sizePx =
+        (FieldChrome.arrowSizePx(config) * INLINE_ARROW_SCALE).roundToInt().coerceAtLeast(24)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Image(
             provider =
@@ -213,11 +347,12 @@ private fun WindCell(
                     arrows.rotated(context, R.drawable.ic_wind_arrow, relative, sizePx, tint)
                 ),
             contentDescription = null,
-            modifier = GlanceModifier.size(sizeDp.dp),
+            modifier = GlanceModifier.size(arrowDp.dp),
         )
-        Spacer(GlanceModifier.width(4.dp))
+        Spacer(GlanceModifier.width(ARROW_GAP_DP.dp))
         Text(
-            text = units.wind(sample.windSpeed).roundToInt().toString(),
+            text = windStr,
+            maxLines = 1,
             style =
                 TextStyle(
                     color = GlanceChrome.provider(Wx.fg),
@@ -225,16 +360,19 @@ private fun WindCell(
                     fontFamily = FontFamily.Monospace,
                 ),
         )
-        Spacer(GlanceModifier.width(2.dp))
-        Text(
-            text = context.getString(FieldChrome.windUnitLabel(units.wind)),
-            style =
-                TextStyle(
-                    color = GlanceChrome.provider(Wx.fgMuted),
-                    fontSize = GlanceChrome.sp(FieldChrome.unitSp(config)),
-                    fontFamily = FontFamily.Monospace,
-                ),
-        )
+        if (showUnit) {
+            Spacer(GlanceModifier.width(UNIT_GAP_DP.dp))
+            Text(
+                text = unitStr,
+                maxLines = 1,
+                style =
+                    TextStyle(
+                        color = GlanceChrome.provider(Wx.fgMuted),
+                        fontSize = GlanceChrome.sp(FieldChrome.unitSp(config)),
+                        fontFamily = FontFamily.Monospace,
+                    ),
+            )
+        }
     }
 }
 
@@ -244,6 +382,7 @@ private fun Gust(context: Context, sample: WeatherSample, units: Units, config: 
         text =
             "${context.getString(R.string.label_gust_short)} " +
                 "${units.wind(sample.windGusts).roundToInt()}",
+        maxLines = 1,
         style =
             TextStyle(
                 color = GlanceChrome.provider(Wx.fgMuted),
@@ -266,6 +405,7 @@ private fun PrecipProbability(sample: WeatherSample, config: ViewConfig) {
         Spacer(GlanceModifier.width(4.dp))
         Text(
             text = "$probability%",
+            maxLines = 1,
             style =
                 TextStyle(
                     color = GlanceChrome.provider(Wx.fgMuted),
@@ -293,6 +433,7 @@ private fun OutlookStrip(config: ViewConfig, outlook: List<WeatherSample>, units
             ) {
                 Text(
                     text = GlanceChrome.hourLabel(entry.time),
+                    maxLines = 1,
                     style =
                         TextStyle(
                             color = GlanceChrome.provider(Wx.fgMuted),
@@ -308,6 +449,7 @@ private fun OutlookStrip(config: ViewConfig, outlook: List<WeatherSample>, units
                 )
                 Text(
                     text = "${units.temp(entry.temp).roundToInt()}°",
+                    maxLines = 1,
                     style =
                         TextStyle(
                             color = GlanceChrome.provider(Wx.forTemp(entry.temp)),
@@ -321,3 +463,18 @@ private fun OutlookStrip(config: ViewConfig, outlook: List<WeatherSample>, units
 }
 
 private const val OUTLOOK_MAX_COLUMNS = 6
+
+/** Gap between the WMO icon and the temperature on the side-by-side layouts, dp. */
+private const val WIDE_ICON_GAP_DP = 8
+
+/** Gap between the temperature and the wind cell on the side-by-side layouts, dp. */
+private const val WIDE_CELL_GAP_DP = 12
+
+/** Gap between the wind arrow and its value, dp. */
+private const val ARROW_GAP_DP = 4
+
+/** Gap between the wind value and its unit suffix, dp. */
+private const val UNIT_GAP_DP = 2
+
+/** The inline wind arrow relative to the standalone `wind` field's arrow. */
+private const val INLINE_ARROW_SCALE = 0.6f

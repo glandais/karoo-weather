@@ -153,4 +153,68 @@ class FieldChromeTest {
             FieldChrome.tempUnitLabel(TempUnit.FAHRENHEIT),
         )
     }
+
+    // ---- row width budgeting -------------------------------------------------------------------
+
+    @Test
+    fun `rowWidthPx sums fixed dp and every measured run`() {
+        assertEquals(38, FieldChrome.rowWidthPx(density = 1.875f, fixedDp = 20))
+        assertEquals(38 + 120 + 40, FieldChrome.rowWidthPx(1.875f, 20, 120, 40))
+    }
+
+    @Test
+    fun `rowWidthPx ignores a negative run and a negative fixed width`() {
+        assertEquals(120, FieldChrome.rowWidthPx(1.875f, -8, 120, -40))
+    }
+
+    @Test
+    fun `rowWidthPx treats a non-positive density as one`() {
+        assertEquals(20 + 120, FieldChrome.rowWidthPx(density = 0f, fixedDp = 20, 120))
+    }
+
+    @Test
+    fun `rowBudgetPx subtracts both paddings`() {
+        val plain = observed()
+        assertEquals(478 - 8, FieldChrome.rowBudgetPx(plain, DENSITY))
+        val bounded = config(60 to 15, 478 to 148, textSize = 69, boundaries = true)
+        assertEquals(478 - 15, FieldChrome.rowBudgetPx(bounded, DENSITY))
+    }
+
+    @Test
+    fun `rowBudgetPx never goes negative on a degenerate viewSize`() {
+        assertEquals(0, FieldChrome.rowBudgetPx(config(30 to 30, 0 to 0), DENSITY))
+    }
+
+    /**
+     * A row that overruns its budget by a single pixel must be reported as not fitting: the caller
+     * sheds an element on `false`, and Glance wraps or clips on the pixel we let through.
+     */
+    @Test
+    fun `rowFits is exact at the budget boundary`() {
+        val observed = observed()
+        val budget = FieldChrome.rowBudgetPx(observed, DENSITY)
+        assertTrue(FieldChrome.rowFits(observed, DENSITY, budget))
+        assertFalse(FieldChrome.rowFits(observed, DENSITY, budget + 1))
+    }
+
+    /**
+     * The geometry the two overrunning rows were observed at: the `weather-now` icon box and the
+     * `wind` arrow have to leave a usable remainder of the 478 px panel for text.
+     */
+    @Test
+    fun `the observed field leaves most of its width to text`() {
+        val observed = observed()
+        assertEquals(33, FieldChrome.iconBoxDp(observed, DENSITY))
+        assertEquals(48, FieldChrome.arrowSizePx(observed))
+        val chrome = FieldChrome.rowWidthPx(DENSITY, 33 + 8 + 12 + 15 + 4 + 2)
+        assertTrue(chrome < FieldChrome.rowBudgetPx(observed, DENSITY) / 2)
+    }
+
+    /** The `startView` geometry the Karoo 3 reports for a full-width, quarter-height field. */
+    private fun observed() = config(60 to 15, 478 to 148, textSize = 69)
+
+    private companion object {
+        /** 300 dpi, as `dumpsys display` reports for the Karoo 3. */
+        const val DENSITY = 1.875f
+    }
 }

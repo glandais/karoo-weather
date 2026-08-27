@@ -17,20 +17,22 @@ import kotlin.math.roundToInt
  *
  * ## Observed `ViewConfig` values (ARCHITECTURE spike S3)
  *
- * The geometry below is the *design assumption* derived from the portrait 480 x 800 ride page
- * (DESIGN preamble). **It has not yet been confirmed against a Karoo 2 / Karoo 3.** Nothing in this
- * file hard-codes a column count, so a device that reports a narrower `viewSize` degrades on its
- * own via [columnsFor]; the table is documentation, not behaviour.
+ * Nothing in this file hard-codes a column count, so a device that reports a narrower `viewSize`
+ * degrades on its own via [columnsFor]; the table is documentation, not behaviour.
  *
- * | gridSize | expected viewSize | expected textSize | columnsFor(maxColumns) |
- * |----------|-------------------|-------------------|------------------------|
- * | (30, 30) | ~240 x 400        | ~32 sp            | 1 (max 1)              |
- * | (60, 15) | ~480 x 200        | ~32 sp            | 3 (max 3)              |
- * | (60, 30) | ~480 x 400        | ~40 sp            | 5 (max 5)              |
- * | (60, 60) | ~480 x 800        | ~48 sp            | 5 (max 6)              |
+ * | gridSize | viewSize   | textSize | columnsFor(maxColumns) | source  |
+ * |----------|------------|----------|------------------------|---------|
+ * | (30, 15) | 238 x 148  | 50 sp    | 2 (max 5)              | Karoo 3 |
+ * | (60, 15) | 478 x 148  | 69 sp    | 5 (max 5)              | Karoo 3 |
+ * | (30, 30) | ~240 x 400 | ~32 sp   | 1 (max 1)              | assumed |
+ * | (60, 30) | ~480 x 400 | ~40 sp   | 5 (max 5)              | assumed |
+ * | (60, 60) | ~480 x 800 | ~48 sp   | 5 (max 6)              | assumed |
  *
- * To fill this in on hardware, place each field at each grid size and read the single
- * `Log.i("karoo-weather", "startView …")` line every graphical field emits on entry to `startView`.
+ * The Karoo 3 rows are measured: a 480 x 800 panel at 300 dpi, so `density` is 1.875 and a
+ * full-width field reports 478 px, not 480. `textSize` is far larger than the design assumed — 69
+ * against ~32 — which is why the width budgeting below exists at all. To fill in the remaining
+ * rows, place each field at that grid size and read the single `Log.i("karoo-weather", "startView
+ * …")` line every graphical field emits on entry to `startView`.
  */
 object FieldChrome {
 
@@ -152,6 +154,35 @@ object FieldChrome {
         val dp = floor(shorterPx * 0.42f / safeDensity).toInt()
         return dp.coerceIn(MIN_ICON_DP, MAX_ICON_DP)
     }
+
+    // ---- row width budgeting (DESIGN §1.3) -----------------------------------------------------
+
+    /**
+     * Width in px of a single row: [fixedDp] of icons and spacers, plus each text run already
+     * measured in px by [FieldText].
+     */
+    fun rowWidthPx(density: Float, fixedDp: Int, vararg textPx: Int): Int {
+        val safeDensity = if (density > 0f) density else 1f
+        val fixedPx = (fixedDp.coerceAtLeast(0) * safeDensity).roundToInt()
+        return textPx.fold(fixedPx) { acc, px -> acc + px.coerceAtLeast(0) }
+    }
+
+    /** Content width a row may occupy: the field's own width less its two paddings. */
+    fun rowBudgetPx(config: ViewConfig, density: Float): Int {
+        val safeDensity = if (density > 0f) density else 1f
+        val padding = (2 * paddingDp(config) * safeDensity).roundToInt()
+        return (config.viewSize.first - padding).coerceAtLeast(0)
+    }
+
+    /**
+     * Whether a row of [contentPx] still fits the field.
+     *
+     * DESIGN §1.3 says to drop an element rather than shrink it; a Glance `Row` that overflows does
+     * neither, it wraps the last run onto a second line (`km/` above `h`) or pushes it off the
+     * panel edge. Callers ask this before composing an optional trailing element.
+     */
+    fun rowFits(config: ViewConfig, density: Float, contentPx: Int): Boolean =
+        contentPx <= rowBudgetPx(config, density)
 
     const val MIN_LABEL_SP = 10f
     const val MIN_MICRO_SP = 9f
