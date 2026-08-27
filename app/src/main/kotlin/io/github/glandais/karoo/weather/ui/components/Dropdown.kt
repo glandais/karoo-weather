@@ -1,11 +1,12 @@
 package io.github.glandais.karoo.weather.ui.components
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.DropdownMenu
@@ -51,7 +52,8 @@ fun <T> Dropdown(
         OutlinedButton(
             onClick = { expanded = true },
             enabled = enabled,
-            modifier = Modifier.heightIn(min = 56.dp).defaultMinSize(minWidth = 120.dp),
+            modifier = Modifier.heightIn(min = 56.dp).widthIn(min = 120.dp, max = 224.dp),
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
         ) {
             Text(
                 text = current?.label.orEmpty(),
@@ -59,11 +61,11 @@ fun <T> Dropdown(
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodyLarge,
             )
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(2.dp))
             Icon(
                 imageVector = Icons.Filled.ArrowDropDown,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(18.dp),
             )
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {

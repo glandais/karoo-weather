@@ -2,6 +2,7 @@ package io.github.glandais.karoo.weather.ui.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,12 +32,40 @@ fun SettingSectionHeader(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * One settings line: a label on the left, a control on the right, 56 dp tall (DESIGN §7).
+ * One settings entry: the label on its own line, the control right-aligned underneath.
  *
- * `heightIn(min = 56.dp)` rather than a fixed height so a two-line label grows instead of clipping.
+ * The Karoo panel is 480 px at 300 dpi, i.e. only 256 dp wide — a label and a dropdown cannot share
+ * a line without one of them wrapping, so the two are stacked (this is also how Karoo's own
+ * settings lists look). Switch rows stay inline via [SettingInlineRow] because a switch is narrow
+ * enough.
  */
 @Composable
 fun SettingRow(
+    title: String,
+    modifier: Modifier = Modifier,
+    control: @Composable RowScope.() -> Unit,
+) {
+    Column(modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            fontFamily = FontFamily.Default,
+            fontSize = 16.sp,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.End,
+        ) {
+            control()
+        }
+    }
+}
+
+/** Label left, control right on one line — only for controls narrow enough to fit (switches). */
+@Composable
+fun SettingInlineRow(
     title: String,
     modifier: Modifier = Modifier,
     control: @Composable RowScope.() -> Unit,
@@ -69,7 +98,7 @@ fun SettingSwitchRow(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    SettingRow(
+    SettingInlineRow(
         title = title,
         modifier = modifier.clickable(enabled = enabled) { onCheckedChange(!checked) },
     ) {
