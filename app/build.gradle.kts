@@ -88,6 +88,13 @@ tasks.register("generateManifest") {
     val versionName = android.defaultConfig.versionName
     val versionCode = android.defaultConfig.versionCode
 
+    // Inputs must be declared: a task with outputs and no inputs is UP-TO-DATE forever, which
+    // would ship a stale manifest.json whenever only the version changed.
+    inputs.property("baseUrl", baseUrl)
+    inputs.property("label", label)
+    inputs.property("packageName", pkg)
+    inputs.property("versionName", versionName)
+    inputs.property("versionCode", versionCode)
     outputs.file(outputFile)
 
     doLast {
