@@ -109,8 +109,15 @@ release APK and publishes `app-release.apk` and `manifest.json` as GitHub Releas
 the generated manifest points at. `versionCode` is derived from the tag as
 `major * 10000 + minor * 100 + patch`.
 
+Release notes come from the tag's own message, so tag with `-a`; they go into `manifest.json`, which
+is what the Karoo extension store shows, and are prepended to the GitHub Release body. A lightweight
+tag falls back to `Release <version>` and logs a warning.
+
 ```bash
-git tag v1.0.0 && git push origin v1.0.0
+git tag -a v1.0.0 -m "Rain alerter tuning
+
+- Nowcast smoothing over 3 samples"
+git push origin v1.0.0
 ```
 
 Signing needs four repository secrets: `KAROO_KEYSTORE_BASE64` (`base64 -i release.keystore`),

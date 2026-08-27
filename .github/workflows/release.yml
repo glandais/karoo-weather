@@ -12,6 +12,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The tag object itself is needed to read an annotated tag's message.
+          fetch-depth: 0
 
       - name: Parse version from tag
         id: version
@@ -21,6 +24,34 @@ jobs:
           CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH))
           echo "name=$TAG" >> "$GITHUB_OUTPUT"
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
+
+      # Release notes come from the annotated tag's message. They land in manifest.json (which the
+      # Karoo extension store shows) and are prepended to the GitHub Release body.
+      #
+      # Only an annotated tag has a message: for a lightweight tag `%(contents)` dereferences to
+      # the commit and would hand us the last commit message, trailers and all. `%(objecttype)`
+      # is what tells the two apart -- `tag` versus `commit`.
+      - name: Read release notes from tag
+        run: |
+          KIND="$(git for-each-ref --format='%(objecttype)' "refs/tags/$GITHUB_REF_NAME")"
+          NOTES=''
+          if [ "$KIND" = 'tag' ]; then
+            NOTES="$(git for-each-ref --format='%(contents)' "refs/tags/$GITHUB_REF_NAME")"
+            # Drop the signature block of a signed tag, then leading/trailing blank lines.
+            NOTES="$(printf '%s' "$NOTES" | sed -e '/^-----BEGIN PGP SIGNATURE-----$/,$d')"
+            NOTES="$(printf '%s' "$NOTES" | awk 'NF {p=1} p')"
+          fi
+          if [ -z "$NOTES" ]; then
+            echo "::warning::$GITHUB_REF_NAME is a $KIND with no usable message. Falling back to the version; use 'git tag -a' to write release notes."
+            NOTES="Release ${GITHUB_REF_NAME#v}"
+          fi
+          {
+            echo 'KAROO_RELEASE_NOTES<<KAROO_NOTES_EOF_7f3a'
+            printf '%s\n' "$NOTES"
+            echo 'KAROO_NOTES_EOF_7f3a'
+          } >> "$GITHUB_ENV"
+          echo "Release notes:"
+          printf '%s\n' "$NOTES"
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6.0.0
@@ -67,4 +98,5 @@ jobs:
           files: |
             app/build/outputs/apk/release/app-release.apk
             app/manifest.json
+          body: ${{ env.KAROO_RELEASE_NOTES }}
           generate_release_notes: true

@@ -6,7 +6,7 @@
     "latestVersionCode": 1,
     "developer": "github.com/glandais",
     "description": "Weather now, wind relative to your heading, rain for the next two hours and a forecast along your route at your estimated arrival time. Weather data by Open-Meteo.com (CC BY 4.0).",
-    "releaseNotes": "First release.",
+    "releaseNotes": "Release 1.0.0",
     "tags": [
         "weather"
     ]

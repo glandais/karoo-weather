@@ -87,6 +87,12 @@ tasks.register("generateManifest") {
     val pkg = "io.github.glandais.karoo.weather"
     val versionName = android.defaultConfig.versionName
     val versionCode = android.defaultConfig.versionCode
+    // Set by the release workflow from the annotated tag's message. Read through System.getenv,
+    // which Gradle instruments as a configuration-cache input; a plain File read at configuration
+    // time would not be tracked.
+    val releaseNotes =
+        System.getenv("KAROO_RELEASE_NOTES")?.trim()?.takeIf { it.isNotEmpty() }
+            ?: "Release $versionName"
 
     // Inputs must be declared: a task with outputs and no inputs is UP-TO-DATE forever, which
     // would ship a stale manifest.json whenever only the version changed.
@@ -95,6 +101,7 @@ tasks.register("generateManifest") {
     inputs.property("packageName", pkg)
     inputs.property("versionName", versionName)
     inputs.property("versionCode", versionCode)
+    inputs.property("releaseNotes", releaseNotes)
     outputs.file(outputFile)
 
     doLast {
@@ -110,7 +117,7 @@ tasks.register("generateManifest") {
                     "Weather now, wind relative to your heading, rain for the next two hours and " +
                         "a forecast along your route at your estimated arrival time. " +
                         "Weather data by Open-Meteo.com (CC BY 4.0).",
-                "releaseNotes" to "First release.",
+                "releaseNotes" to releaseNotes,
                 "tags" to listOf("weather"),
             )
         outputFile.asFile.writeText(groovy.json.JsonBuilder(manifest).toPrettyString())
