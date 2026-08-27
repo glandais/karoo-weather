@@ -99,6 +99,23 @@ everything else.
 the file the Karoo extension store polls for updates; override the URLs it points at with the
 `KAROO_BASE_URL`, `KAROO_VERSION_NAME` and `KAROO_VERSION_CODE` environment variables.
 
+## Release
+
+CI (`.github/workflows/ci.yml`) runs `spotlessCheck`, `testDebugUnitTest`, `lintDebug`,
+`assembleDebug` and `assembleRelease` on every push and pull request to `main`.
+
+Pushing a `v<major>.<minor>.<patch>` tag runs `.github/workflows/release.yml`, which builds a signed
+release APK and publishes `app-release.apk` and `manifest.json` as GitHub Release assets — the URLs
+the generated manifest points at. `versionCode` is derived from the tag as
+`major * 10000 + minor * 100 + patch`.
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+Signing needs four repository secrets: `KAROO_KEYSTORE_BASE64` (`base64 -i release.keystore`),
+`KAROO_KEYSTORE_PASSWORD`, `KAROO_KEY_ALIAS` and `KAROO_KEY_PASSWORD`.
+
 ## Attribution
 
 **Weather data by Open-Meteo.com (CC BY 4.0)**
