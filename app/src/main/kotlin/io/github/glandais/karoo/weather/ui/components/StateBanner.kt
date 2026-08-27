@@ -147,7 +147,12 @@ private fun Banner(
  * stay empty for minutes reads as a hang.
  */
 @Composable
-fun InfoState(@DrawableRes iconRes: Int, title: String, body: String, modifier: Modifier = Modifier) {
+fun InfoState(
+    @DrawableRes iconRes: Int,
+    title: String,
+    body: String,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier.fillMaxWidth().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

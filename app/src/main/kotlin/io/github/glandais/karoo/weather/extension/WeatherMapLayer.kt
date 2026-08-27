@@ -27,8 +27,8 @@ import kotlinx.coroutines.launch
 /**
  * Draws the route forecast on the Karoo map as vector symbols.
  *
- * ONE INSTANCE PER `startMap` CALL. [previousIds] is instance state, never in the companion object, so a
- * `stopMap` -> `startMap` cycle cannot leak symbol ids across instances.
+ * ONE INSTANCE PER `startMap` CALL. [previousIds] is instance state, never in the companion object,
+ * so a `stopMap` -> `startMap` cycle cannot leak symbol ids across instances.
  */
 class WeatherMapLayer(
     private val context: Context,
@@ -44,35 +44,35 @@ class WeatherMapLayer(
         get() = shownIds
 
     /**
-     * Called from `KarooExtension.startMap` with `WeatherExtension.extensionScope` (the SDK passes no
-     * scope). Returns the job; the caller must
+     * Called from `KarooExtension.startMap` with `WeatherExtension.extensionScope` (the SDK passes
+     * no scope). Returns the job; the caller must
+     *
      * ```
      * emitter.setCancellable { job.cancel(); emitter.onNext(HideSymbols(previousIds)) }
      * ```
      */
-    fun start(emitter: Emitter<MapEffect>, scope: CoroutineScope): Job =
-        scope.launch {
-            // OnMapZoomLevel does not promise replay-on-subscribe and `combine` emits nothing until every
-            // source has emitted, so the zoom flow is seeded: without it no symbol would appear until the
-            // rider pinched the map.
-            combine(
-                    repo.state,
-                    karoo
-                        .consumerFlow<OnMapZoomLevel>()
-                        .onStart { emit(OnMapZoomLevel(DEFAULT_ZOOM)) },
-                    repo.settings,
-                ) { snapshot: WeatherSnapshot, zoom: OnMapZoomLevel, settings: WeatherSettings ->
-                    Render(
-                        points = snapshot.bundle?.route?.points.orEmpty(),
-                        fetchedAt = snapshot.bundle?.fetchedAt,
-                        spacing = symbolSpacingFor(zoom.zoomLevel),
-                        enabled = settings.mapLayerEnabled,
-                    )
-                }
-                // Re-emit only when the bundle or the zoom BUCKET changes, never on a GPS tick.
-                .distinctUntilChangedBy { Triple(it.fetchedAt, it.spacing, it.enabled) }
-                .collect { render -> applyRender(emitter, render) }
-        }
+    fun start(emitter: Emitter<MapEffect>, scope: CoroutineScope): Job = scope.launch {
+        // OnMapZoomLevel does not promise replay-on-subscribe and `combine` emits nothing until
+        // every
+        // source has emitted, so the zoom flow is seeded: without it no symbol would appear until
+        // the
+        // rider pinched the map.
+        combine(
+                repo.state,
+                karoo.consumerFlow<OnMapZoomLevel>().onStart { emit(OnMapZoomLevel(DEFAULT_ZOOM)) },
+                repo.settings,
+            ) { snapshot: WeatherSnapshot, zoom: OnMapZoomLevel, settings: WeatherSettings ->
+                Render(
+                    points = snapshot.bundle?.route?.points.orEmpty(),
+                    fetchedAt = snapshot.bundle?.fetchedAt,
+                    spacing = symbolSpacingFor(zoom.zoomLevel),
+                    enabled = settings.mapLayerEnabled,
+                )
+            }
+            // Re-emit only when the bundle or the zoom BUCKET changes, never on a GPS tick.
+            .distinctUntilChangedBy { Triple(it.fetchedAt, it.spacing, it.enabled) }
+            .collect { render -> applyRender(emitter, render) }
+    }
 
     private data class Render(
         val points: List<RoutePointForecast>,
@@ -117,7 +117,8 @@ class WeatherMapLayer(
                     lat = forecast.point.lat,
                     lng = forecast.point.lon,
                     iconRes = R.drawable.ic_map_wind_arrow,
-                    // Symbol.Icon.orientation is "0 is North, 90 is East" - the meteorological convention
+                    // Symbol.Icon.orientation is "0 is North, 90 is East" - the meteorological
+                    // convention
                     // after the +180 flip, so the arrow points where the wind is going.
                     orientation = sample.windToDir.toFloat(),
                 )
@@ -149,7 +150,9 @@ class WeatherMapLayer(
                 else -> 20_000.0
             }
 
-        /** Greedy selection of points at least [spacing] apart, always keeping first and last. Pure. */
+        /**
+         * Greedy selection of points at least [spacing] apart, always keeping first and last. Pure.
+         */
         fun selectPoints(
             points: List<RoutePointForecast>,
             spacing: Double,

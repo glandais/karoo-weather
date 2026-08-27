@@ -4,10 +4,10 @@ import android.content.Context
 import android.util.Log
 import androidx.compose.ui.unit.DpSize
 import androidx.glance.GlanceModifier
+import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 import androidx.glance.appwidget.GlanceRemoteViews
-import androidx.glance.action.actionStartActivity
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
 import io.github.glandais.karoo.weather.MainActivity
@@ -72,31 +72,29 @@ class WeatherNowDataType(private val context: Context, private val repo: Weather
         val night = FieldChrome.night(context)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-        val configJob =
-            scope.launch {
-                emitter.onNext(UpdateGraphicConfig(showHeader = true))
-                emitter.onNext(FieldChrome.clearState())
+        scope.launch {
+            emitter.onNext(UpdateGraphicConfig(showHeader = true))
+            emitter.onNext(FieldChrome.clearState())
+            awaitCancellation()
+        }
+
+        scope.launch {
+            if (config.preview) {
+                render(glance, context, config, PreviewData.snapshot, night, arrows, emitter)
                 awaitCancellation()
             }
-
-        val viewJob =
-            scope.launch {
-                if (config.preview) {
-                    render(glance, context, config, PreviewData.snapshot, night, arrows, emitter)
-                    awaitCancellation()
-                }
-                val refreshMs = FieldLoop.refreshMs(repo.karooOrNull, repo)
-                FieldLoop.flow(repo.karooOrNull, repo, dataTypeId).throttle(refreshMs).collect {
-                    data ->
-                    if (!data.visible) return@collect
-                    emitter.onNext(FieldLoop.customState(context, data.snapshot, night))
-                    render(glance, context, config, data.snapshot, night, arrows, emitter)
-                }
+            val refreshMs = FieldLoop.refreshMs(repo.karooOrNull, repo)
+            FieldLoop.flow(repo.karooOrNull, repo, dataTypeId).throttle(refreshMs).collect { data ->
+                if (!data.visible) return@collect
+                emitter.onNext(FieldLoop.customState(context, data.snapshot, night))
+                render(glance, context, config, data.snapshot, night, arrows, emitter)
             }
+        }
 
+        // Cancelling the scope, not the two jobs individually: it releases the parent
+        // SupervisorJob too, so nothing survives a stopView.
         emitter.setCancellable {
-            configJob.cancel()
-            viewJob.cancel()
+            scope.cancel()
             arrows.clear()
         }
     }
@@ -120,8 +118,7 @@ class WeatherNowDataType(private val context: Context, private val repo: Weather
                     if (config.preview) {
                         GlanceModifier.fillMaxSize()
                     } else {
-                        GlanceModifier.fillMaxSize()
-                            .clickable(actionStartActivity<MainActivity>())
+                        GlanceModifier.fillMaxSize().clickable(actionStartActivity<MainActivity>())
                     }
                 Box(modifier = modifier) {
                     WeatherNowView(

@@ -22,13 +22,13 @@ import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.ViewEmitter
 import io.hammerhead.karooext.models.UpdateGraphicConfig
 import io.hammerhead.karooext.models.ViewConfig
+import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 /**
  * `rain-next-hour` — eight 15-minute nowcast bars (two hours), or hourly bars when the nowcast is
@@ -52,31 +52,29 @@ class RainNextHourDataType(private val context: Context, private val repo: Weath
         val night = FieldChrome.night(context)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-        val configJob =
-            scope.launch {
-                emitter.onNext(UpdateGraphicConfig(showHeader = false))
-                emitter.onNext(FieldChrome.clearState())
+        scope.launch {
+            emitter.onNext(UpdateGraphicConfig(showHeader = false))
+            emitter.onNext(FieldChrome.clearState())
+            awaitCancellation()
+        }
+
+        scope.launch {
+            if (config.preview) {
+                render(glance, context, config, PreviewData.buckets, night, emitter)
                 awaitCancellation()
             }
-
-        val viewJob =
-            scope.launch {
-                if (config.preview) {
-                    render(glance, context, config, PreviewData.buckets, night, emitter)
-                    awaitCancellation()
-                }
-                val refreshMs = FieldLoop.refreshMs(repo.karooOrNull, repo)
-                FieldLoop.flow(repo.karooOrNull, repo, dataTypeId).throttle(refreshMs).collect {
-                    data ->
-                    if (!data.visible) return@collect
-                    emitter.onNext(FieldLoop.customState(context, data.snapshot, night))
-                    render(glance, context, config, repo.rainBuckets(NOWCAST_BARS), night, emitter)
-                }
+            val refreshMs = FieldLoop.refreshMs(repo.karooOrNull, repo)
+            FieldLoop.flow(repo.karooOrNull, repo, dataTypeId).throttle(refreshMs).collect { data ->
+                if (!data.visible) return@collect
+                emitter.onNext(FieldLoop.customState(context, data.snapshot, night))
+                render(glance, context, config, repo.rainBuckets(NOWCAST_BARS), night, emitter)
             }
+        }
 
+        // Cancelling the scope, not the two jobs individually: it releases the parent
+        // SupervisorJob too, so nothing survives a stopView.
         emitter.setCancellable {
-            configJob.cancel()
-            viewJob.cancel()
+            scope.cancel()
         }
     }
 

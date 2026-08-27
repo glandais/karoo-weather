@@ -23,11 +23,11 @@ import kotlin.math.roundToInt
  * own via [columnsFor]; the table is documentation, not behaviour.
  *
  * | gridSize | expected viewSize | expected textSize | columnsFor(maxColumns) |
- * |---|---|---|---|
- * | (30, 30) | ~240 x 400 | ~32 sp | 1 (max 1) |
- * | (60, 15) | ~480 x 200 | ~32 sp | 3 (max 3) |
- * | (60, 30) | ~480 x 400 | ~40 sp | 5 (max 5) |
- * | (60, 60) | ~480 x 800 | ~48 sp | 5 (max 6) |
+ * |----------|-------------------|-------------------|------------------------|
+ * | (30, 30) | ~240 x 400        | ~32 sp            | 1 (max 1)              |
+ * | (60, 15) | ~480 x 200        | ~32 sp            | 3 (max 3)              |
+ * | (60, 30) | ~480 x 400        | ~40 sp            | 5 (max 5)              |
+ * | (60, 60) | ~480 x 800        | ~48 sp            | 5 (max 6)              |
  *
  * To fill this in on hardware, place each field at each grid size and read the single
  * `Log.i("karoo-weather", "startView …")` line every graphical field emits on entry to `startView`.
@@ -58,9 +58,8 @@ object FieldChrome {
     fun night(context: Context): Boolean = isNightMode(context)
 
     /**
-     * The ONLY sanctioned way to build a [ShowCustomStreamState]: the SDK signature is
-     * `(message: String?, @ColorInt color: Int?)` and takes neither a `@StringRes` nor a
-     * [ColorPair].
+     * The ONLY sanctioned way to build a [ShowCustomStreamState]: the SDK signature is `(message:
+     * String?, @ColorInt color: Int?)` and takes neither a `@StringRes` nor a [ColorPair].
      */
     fun customState(
         context: Context,
@@ -96,13 +95,14 @@ object FieldChrome {
         }
 
     /** [index] is `RelativeWind.compassIndex`, 0..15 for N, NNE, NE, ... Out of range wraps. */
-    @StringRes
-    fun compassLabel(index: Int): Int = COMPASS_LABELS[((index % 16) + 16) % 16]
+    @StringRes fun compassLabel(index: Int): Int = COMPASS_LABELS[((index % 16) + 16) % 16]
 
     /** 4 dp when the user asked for field boundaries, else 2 dp (DESIGN §1.4). */
     fun paddingDp(config: ViewConfig): Int = if (config.boundariesEnabled) 4 else 2
 
-    /** 48 px, or 56 px on a tall field (DESIGN §1.4). Never the 128 px a 293 ppi panel cannot show. */
+    /**
+     * 48 px, or 56 px on a tall field (DESIGN §1.4). Never the 128 px a 293 ppi panel cannot show.
+     */
     fun arrowSizePx(config: ViewConfig): Int = if (config.viewSize.second > 300) 56 else 48
 
     /**

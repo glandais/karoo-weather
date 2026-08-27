@@ -273,9 +273,7 @@ private fun PrecipProbability(sample: WeatherSample, config: ViewConfig) {
 
 @Composable
 private fun ColumnScope.Divider() {
-    Spacer(
-        GlanceModifier.fillMaxWidth().height(1.dp).background(GlanceChrome.provider(Wx.divider))
-    )
+    Spacer(GlanceModifier.fillMaxWidth().height(1.dp).background(GlanceChrome.provider(Wx.divider)))
 }
 
 @Composable

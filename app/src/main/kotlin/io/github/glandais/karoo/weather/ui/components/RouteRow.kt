@@ -64,8 +64,7 @@ fun RouteRow(
     val wet = point.sample.precip >= 0.2
     val dimmed = point.beyondHorizon
 
-    val rowBackground =
-        if (wet) Wx.rainMed.asColor().copy(alpha = 0.12f) else Color.Transparent
+    val rowBackground = if (wet) Wx.rainMed.asColor().copy(alpha = 0.12f) else Color.Transparent
 
     Row(
         modifier =
@@ -80,7 +79,11 @@ fun RouteRow(
         val alpha = if (dimmed) 0.5f else 1f
 
         Text(
-            text = stringResource(distanceAheadLabel(units.distance), Distance.format(ahead, units.distance)),
+            text =
+                stringResource(
+                    distanceAheadLabel(units.distance),
+                    Distance.format(ahead, units.distance),
+                ),
             style = MaterialTheme.typography.bodyMedium,
             fontFamily = FontFamily.Monospace,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
@@ -88,7 +91,9 @@ fun RouteRow(
         )
 
         Text(
-            text = if (dimmed) stringResource(R.string.horizon_beyond) else TimeFormat.clock(point.eta),
+            text =
+                if (dimmed) stringResource(R.string.horizon_beyond)
+                else TimeFormat.clock(point.eta),
             style = MaterialTheme.typography.bodyMedium,
             fontFamily = FontFamily.Monospace,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
@@ -96,7 +101,8 @@ fun RouteRow(
         )
 
         Icon(
-            painter = painterResource(WmoIcons.fieldForCode(point.sample.wmoCode, point.sample.isDay)),
+            painter =
+                painterResource(WmoIcons.fieldForCode(point.sample.wmoCode, point.sample.isDay)),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
             modifier = Modifier.size(24.dp),

@@ -98,8 +98,6 @@ class StripLayoutTest {
                 .toLong(),
         )
         // An hourly bucket must be judged on its normalised rate, not its raw millimetres.
-        assertNull(
-            BarChartBuilder.firstWetTime(listOf(bucket(0.3, durationSec = 3600, time = 40)))
-        )
+        assertNull(BarChartBuilder.firstWetTime(listOf(bucket(0.3, durationSec = 3600, time = 40))))
     }
 }

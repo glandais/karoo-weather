@@ -103,9 +103,7 @@ fun AppTheme(content: @Composable () -> Unit) {
 }
 
 /** The `Wx` token resolved against the current system theme. */
-@Composable
-@ReadOnlyComposable
-fun ColorPair.asColor(): Color = Color(pick(isSystemInDarkTheme()))
+@Composable @ReadOnlyComposable fun ColorPair.asColor(): Color = Color(pick(isSystemInDarkTheme()))
 
 /** The `Wx` token resolved against an explicit side, for callers that already know it. */
 fun ColorPair.toColor(night: Boolean): Color = Color(pick(night))

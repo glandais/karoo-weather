@@ -122,7 +122,12 @@ object BarChartBuilder {
             var i = 0
             while (i < n) {
                 val left = pad + i * (unit + gap)
-                canvas.drawText(clock.format(Date(buckets[i].time * 1000L)), left, axisBaseline, text)
+                canvas.drawText(
+                    clock.format(Date(buckets[i].time * 1000L)),
+                    left,
+                    axisBaseline,
+                    text,
+                )
                 i += step
             }
             if (summary != null) {
@@ -153,14 +158,13 @@ object BarChartBuilder {
         bottom: Float,
         colour: Int,
     ) {
-        val points =
-            buckets.mapIndexedNotNull { i, bucket ->
-                bucket.probability?.let { probability ->
-                    val x = pad + i * (unit + gap) + unit / 2f
-                    val y = bottom - (bottom - top) * (probability.coerceIn(0, 100) / 100f)
-                    x to y
-                }
+        val points = buckets.mapIndexedNotNull { i, bucket ->
+            bucket.probability?.let { probability ->
+                val x = pad + i * (unit + gap) + unit / 2f
+                val y = bottom - (bottom - top) * (probability.coerceIn(0, 100) / 100f)
+                x to y
             }
+        }
         if (points.size < 2) return
         val path = Path()
         path.moveTo(points[0].first, points[0].second)

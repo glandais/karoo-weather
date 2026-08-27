@@ -64,31 +64,29 @@ class WindDataType(private val context: Context, private val repo: WeatherReposi
         val night = FieldChrome.night(context)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-        val configJob =
-            scope.launch {
-                emitter.onNext(UpdateGraphicConfig(showHeader = false))
-                emitter.onNext(FieldChrome.clearState())
+        scope.launch {
+            emitter.onNext(UpdateGraphicConfig(showHeader = false))
+            emitter.onNext(FieldChrome.clearState())
+            awaitCancellation()
+        }
+
+        scope.launch {
+            if (config.preview) {
+                render(glance, context, config, PreviewData.snapshot, night, arrows, emitter)
                 awaitCancellation()
             }
-
-        val viewJob =
-            scope.launch {
-                if (config.preview) {
-                    render(glance, context, config, PreviewData.snapshot, night, arrows, emitter)
-                    awaitCancellation()
-                }
-                val refreshMs = FieldLoop.refreshMs(repo.karooOrNull, repo)
-                FieldLoop.flow(repo.karooOrNull, repo, dataTypeId).throttle(refreshMs).collect {
-                    data ->
-                    if (!data.visible) return@collect
-                    emitter.onNext(FieldLoop.customState(context, data.snapshot, night))
-                    render(glance, context, config, data.snapshot, night, arrows, emitter)
-                }
+            val refreshMs = FieldLoop.refreshMs(repo.karooOrNull, repo)
+            FieldLoop.flow(repo.karooOrNull, repo, dataTypeId).throttle(refreshMs).collect { data ->
+                if (!data.visible) return@collect
+                emitter.onNext(FieldLoop.customState(context, data.snapshot, night))
+                render(glance, context, config, data.snapshot, night, arrows, emitter)
             }
+        }
 
+        // Cancelling the scope, not the two jobs individually: it releases the parent
+        // SupervisorJob too, so nothing survives a stopView.
         emitter.setCancellable {
-            configJob.cancel()
-            viewJob.cancel()
+            scope.cancel()
             arrows.clear()
         }
     }

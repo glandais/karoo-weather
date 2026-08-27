@@ -23,8 +23,9 @@ import kotlinx.coroutines.launch
 /**
  * Opt-in in-ride "rain starting" alert.
  *
- * Dispatches at most one [InRideAlert] per [COOLDOWN_SEC], only while the ride is recording, only when the
- * rider is not already in the rain, and only when a wet bucket falls within [LOOKAHEAD_SEC].
+ * Dispatches at most one [InRideAlert] per [COOLDOWN_SEC], only while the ride is recording, only
+ * when the rider is not already in the rain, and only when a wet bucket falls within
+ * [LOOKAHEAD_SEC].
  */
 class RainAlerter(
     private val context: Context,
@@ -34,17 +35,16 @@ class RainAlerter(
 
     private var lastAlertSec: Long? = null
 
-    fun start(scope: CoroutineScope): Job =
-        scope.launch {
-            combine(
-                    repo.settings,
-                    karoo.streamRideState().onStart { emit(RideState.Idle) },
-                    ticker(),
-                ) { settings: WeatherSettings, rideState: RideState, _: Unit ->
-                    settings.rainAlertEnabled to (rideState is RideState.Recording)
-                }
-                .collect { (enabled, recording) -> evaluate(enabled, recording) }
-        }
+    fun start(scope: CoroutineScope): Job = scope.launch {
+        combine(
+                repo.settings,
+                karoo.streamRideState().onStart { emit(RideState.Idle) },
+                ticker(),
+            ) { settings: WeatherSettings, rideState: RideState, _: Unit ->
+                settings.rainAlertEnabled to (rideState is RideState.Recording)
+            }
+            .collect { (enabled, recording) -> evaluate(enabled, recording) }
+    }
 
     private fun evaluate(enabled: Boolean, recording: Boolean) {
         if (!enabled || !recording) return
@@ -89,7 +89,10 @@ class RainAlerter(
         /** Enough 15-minute buckets to cover [LOOKAHEAD_SEC] plus the bucket containing "now". */
         const val BUCKET_COUNT = 8
 
-        /** Pure decision function. Minutes until the first wet bucket within [LOOKAHEAD_SEC], or null. */
+        /**
+         * Pure decision function. Minutes until the first wet bucket within [LOOKAHEAD_SEC], or
+         * null.
+         */
         fun rainStartingIn(buckets: List<PrecipBucket>, nowSec: Long): Int? =
             firstWetBucket(buckets, nowSec)?.let { minutesUntil(it.time, nowSec) }
 
@@ -106,9 +109,10 @@ class RainAlerter(
         }
 
         /**
-         * The first bucket starting after [nowSec] and within [LOOKAHEAD_SEC] whose precipitation reaches
-         * [WET_MM]. Null when the rider is ALREADY in the rain (the bucket containing `now` is wet), which
-         * is not a "rain starting" event, and null when the dry spell outlasts the lookahead.
+         * The first bucket starting after [nowSec] and within [LOOKAHEAD_SEC] whose precipitation
+         * reaches [WET_MM]. Null when the rider is ALREADY in the rain (the bucket containing `now`
+         * is wet), which is not a "rain starting" event, and null when the dry spell outlasts the
+         * lookahead.
          */
         private fun firstWetBucket(buckets: List<PrecipBucket>, nowSec: Long): PrecipBucket? {
             for (bucket in buckets.sortedBy { it.time }) {

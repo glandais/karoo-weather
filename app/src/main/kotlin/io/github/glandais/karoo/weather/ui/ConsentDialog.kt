@@ -25,8 +25,7 @@ import io.github.glandais.karoo.weather.R
 fun ConsentDialog(onAccept: () -> Unit, onDecline: () -> Unit) {
     AlertDialog(
         onDismissRequest = {},
-        properties =
-            DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
+        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
         title = {
             Text(
                 text = stringResource(R.string.consent_title),

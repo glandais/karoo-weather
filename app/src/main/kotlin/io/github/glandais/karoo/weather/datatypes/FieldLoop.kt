@@ -58,8 +58,8 @@ internal object FieldLoop {
         karoo?.viewRefreshMs(repo.settings.first()) ?: SLOW_REFRESH_MS
 
     /**
-     * The empty / loading / error message for a field, per DESIGN §6, or a cleared state when
-     * there is data to draw. Cached values always win over a spinner: a data field never shows one.
+     * The empty / loading / error message for a field, per DESIGN §6, or a cleared state when there
+     * is data to draw. Cached values always win over a spinner: a data field never shows one.
      */
     fun customState(
         context: Context,

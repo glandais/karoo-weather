@@ -55,7 +55,12 @@ class RainAlerterTest {
     @Test
     fun `past buckets are skipped`() {
         val withPast =
-            listOf(bucket(-5_400L, 5.0), bucket(-1_800L, 5.0), bucket(-180L, 0.0), bucket(600L, 1.0))
+            listOf(
+                bucket(-5_400L, 5.0),
+                bucket(-1_800L, 5.0),
+                bucket(-180L, 0.0),
+                bucket(600L, 1.0),
+            )
         assertEquals(10, rainStartingIn(withPast, now))
     }
 
@@ -98,9 +103,7 @@ class RainAlerterTest {
 
     @Test
     fun `cooldown blocks a second alert`() {
-        assertFalse(
-            shouldAlert(12, now - COOLDOWN_SEC + 1, now, enabled = true, recording = true)
-        )
+        assertFalse(shouldAlert(12, now - COOLDOWN_SEC + 1, now, enabled = true, recording = true))
     }
 
     @Test

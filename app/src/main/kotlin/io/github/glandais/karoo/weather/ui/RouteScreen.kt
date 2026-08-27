@@ -111,7 +111,10 @@ private fun RouteHeader(route: RouteForecast, units: Units) {
                 route.firstWetDistance?.let { wetAt ->
                     stringResource(
                         aheadRes,
-                        Distance.format((wetAt - route.progress).coerceAtLeast(0.0), units.distance),
+                        Distance.format(
+                            (wetAt - route.progress).coerceAtLeast(0.0),
+                            units.distance,
+                        ),
                     )
                 }
             val summary =

@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+      No location permission: the rider's position comes from the Karoo LOCATION stream over the
+      extension Binder, never from Android's own location provider.
+    -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
@@ -19,8 +23,17 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Lets SystemNotification(actionIntent = …) open the companion app. -->
+            <intent-filter>
+                <action android:name="io.github.glandais.karoo.weather.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
+        <!--
+          No android:process: WeatherGraph's single-repository-per-process assumption, and with it
+          the single KarooSystemService, depends on the service and the activity sharing a process.
+        -->
         <service
             android:name=".WeatherExtension"
             android:exported="true"
@@ -32,5 +45,10 @@
                 android:name="io.hammerhead.karooext.EXTENSION_INFO"
                 android:resource="@xml/extension_info" />
         </service>
+
+        <!-- Injected from app/build.gradle.kts; never rewritten in place at build time. -->
+        <meta-data
+            android:name="io.hammerhead.karooext.MANIFEST_URL"
+            android:value="${karooManifestUrl}" />
     </application>
 </manifest>

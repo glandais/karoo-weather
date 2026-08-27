@@ -25,7 +25,8 @@ fun SettingSectionHeader(text: String, modifier: Modifier = Modifier) {
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.primary,
         fontFamily = FontFamily.Default,
-        modifier = modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp),
+        modifier =
+            modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp),
     )
 }
 
@@ -35,7 +36,11 @@ fun SettingSectionHeader(text: String, modifier: Modifier = Modifier) {
  * `heightIn(min = 56.dp)` rather than a fixed height so a two-line label grows instead of clipping.
  */
 @Composable
-fun SettingRow(title: String, modifier: Modifier = Modifier, control: @Composable RowScope.() -> Unit) {
+fun SettingRow(
+    title: String,
+    modifier: Modifier = Modifier,
+    control: @Composable RowScope.() -> Unit,
+) {
     Row(
         modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,

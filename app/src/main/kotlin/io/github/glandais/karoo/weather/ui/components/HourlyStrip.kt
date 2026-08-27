@@ -36,10 +36,10 @@ import kotlin.math.max
  * The next hours as a horizontally scrolled strip (DESIGN §5): hour, condition icon, temperature,
  * rain bar.
  *
- * The bars are drawn with a Compose `Canvas` rather than assembled from `Box` heights: the bar,
- * its baseline and the "no rain at all" case are one drawing decision, and a `Box` whose height is
- * a fraction of a parent that itself has no intrinsic height is exactly the layout that collapses
- * to zero on a narrow screen.
+ * The bars are drawn with a Compose `Canvas` rather than assembled from `Box` heights: the bar, its
+ * baseline and the "no rain at all" case are one drawing decision, and a `Box` whose height is a
+ * fraction of a parent that itself has no intrinsic height is exactly the layout that collapses to
+ * zero on a narrow screen.
  *
  * Scrolling a list is not the drag-gesture DESIGN §7 forbids — that rule is about a drag being the
  * only path to an *action*. Everything actionable in this app is a tap.

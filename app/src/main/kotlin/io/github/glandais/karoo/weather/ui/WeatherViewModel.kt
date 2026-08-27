@@ -48,7 +48,9 @@ class WeatherViewModel(private val repo: WeatherRepository) : ViewModel() {
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
             return viewModelFactory {
-                initializer<WeatherViewModel> { WeatherViewModel(WeatherGraph.repository(appContext)) }
+                initializer<WeatherViewModel> {
+                    WeatherViewModel(WeatherGraph.repository(appContext))
+                }
             }
         }
     }

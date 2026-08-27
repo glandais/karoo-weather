@@ -67,7 +67,6 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-
         SettingSectionHeader(stringResource(R.string.settings_units))
 
         val followKaroo = stringResource(R.string.settings_follow_karoo)
@@ -90,8 +89,14 @@ fun SettingsScreen(
         val windOptions =
             listOf(
                 DropdownOption<WindUnit?>(null, followKaroo),
-                DropdownOption<WindUnit?>(WindUnit.KMH, stringResource(windUnitLabel(WindUnit.KMH))),
-                DropdownOption<WindUnit?>(WindUnit.MPH, stringResource(windUnitLabel(WindUnit.MPH))),
+                DropdownOption<WindUnit?>(
+                    WindUnit.KMH,
+                    stringResource(windUnitLabel(WindUnit.KMH)),
+                ),
+                DropdownOption<WindUnit?>(
+                    WindUnit.MPH,
+                    stringResource(windUnitLabel(WindUnit.MPH)),
+                ),
                 DropdownOption<WindUnit?>(WindUnit.MS, stringResource(windUnitLabel(WindUnit.MS))),
                 DropdownOption<WindUnit?>(
                     WindUnit.KNOTS,

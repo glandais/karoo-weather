@@ -35,7 +35,9 @@ import io.github.glandais.karoo.weather.weather.Interpolation
 
 private const val HOUR_SEC = 3_600L
 
-/** Buckets covering the next two hours: eight quarter-hours, or two hours from the hourly series. */
+/**
+ * Buckets covering the next two hours: eight quarter-hours, or two hours from the hourly series.
+ */
 private const val NOWCAST_BUCKETS = 8
 private const val HOURLY_FALLBACK_BUCKETS = 2
 
@@ -57,11 +59,15 @@ fun NowScreen(
     val here = snapshot.bundle?.here
 
     val sample =
-        remember(here, nowSec) { here?.let { Interpolation.sampleAt(it.hourly, nowSec) ?: it.current } }
+        remember(here, nowSec) {
+            here?.let { Interpolation.sampleAt(it.hourly, nowSec) ?: it.current }
+        }
 
     val rainNext2hMm =
         remember(here, nowSec) {
-            val nowcast = here?.let { Interpolation.bucketsFrom(it.minutely15, nowSec, NOWCAST_BUCKETS) }
+            val nowcast = here?.let {
+                Interpolation.bucketsFrom(it.minutely15, nowSec, NOWCAST_BUCKETS)
+            }
             val buckets =
                 if (!nowcast.isNullOrEmpty()) nowcast
                 else
@@ -76,7 +82,6 @@ fun NowScreen(
         }
 
     Column(modifier = modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -145,7 +150,8 @@ private fun EmptyNow(loading: Boolean) {
 private fun Footer(snapshot: WeatherSnapshot, nowSec: Long) {
     val updated =
         snapshot.lastSuccessAt?.let {
-            stringResource(R.string.app_updated_ago, TimeFormat.ago(nowSec, it)) + AppLiterals.SEPARATOR
+            stringResource(R.string.app_updated_ago, TimeFormat.ago(nowSec, it)) +
+                AppLiterals.SEPARATOR
         } ?: ""
     Text(
         text = updated + stringResource(R.string.attribution_open_meteo),

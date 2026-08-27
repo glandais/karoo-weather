@@ -130,39 +130,37 @@ object PreviewData {
                 Row(54_000.0, 160, 61, 18.0, 21.5 * KMH, 155.0),
                 Row(72_000.0, 212, 2, 20.0, 16.0 * KMH, 120.0),
             )
-        val points =
-            spec.map { row ->
-                val eta = BASE_TIME + row.minutes * 60L
-                val bearing = 90.0
-                // windDir is meteorological (FROM); invert the relative angle to recover it.
-                val windTo = (bearing + row.relativeAngle + 360.0) % 360.0
-                val windFrom = (windTo + 180.0) % 360.0
-                val precip = if (row.code >= 51) 1.1 else 0.0
-                RoutePointForecast(
-                    point = GeoPoint(48.8566 + row.distance / 111_320.0, 2.3522),
-                    distanceAlong = row.distance,
-                    eta = eta,
-                    routeBearing = bearing,
-                    sample =
-                        WeatherSample(
-                            time = eta,
-                            temp = row.temp,
-                            apparentTemp = row.temp + 2.0,
-                            windSpeed = row.windMs,
-                            windGusts = row.windMs * 1.8,
-                            windDir = windFrom,
-                            precip = precip,
-                            precipProb = if (precip > 0) 70 else 10,
-                            wmoCode = row.code,
-                            cloudCover = if (row.code >= 51) 90 else 30,
-                            isDay = true,
-                        ),
-                    relativeWindAngle = row.relativeAngle,
-                    headwindSpeed =
-                        RelativeWind.headwindComponent(row.relativeAngle, row.windMs),
-                    beyondHorizon = false,
-                )
-            }
+        val points = spec.map { row ->
+            val eta = BASE_TIME + row.minutes * 60L
+            val bearing = 90.0
+            // windDir is meteorological (FROM); invert the relative angle to recover it.
+            val windTo = (bearing + row.relativeAngle + 360.0) % 360.0
+            val windFrom = (windTo + 180.0) % 360.0
+            val precip = if (row.code >= 51) 1.1 else 0.0
+            RoutePointForecast(
+                point = GeoPoint(48.8566 + row.distance / 111_320.0, 2.3522),
+                distanceAlong = row.distance,
+                eta = eta,
+                routeBearing = bearing,
+                sample =
+                    WeatherSample(
+                        time = eta,
+                        temp = row.temp,
+                        apparentTemp = row.temp + 2.0,
+                        windSpeed = row.windMs,
+                        windGusts = row.windMs * 1.8,
+                        windDir = windFrom,
+                        precip = precip,
+                        precipProb = if (precip > 0) 70 else 10,
+                        wmoCode = row.code,
+                        cloudCover = if (row.code >= 51) 90 else 30,
+                        isDay = true,
+                    ),
+                relativeWindAngle = row.relativeAngle,
+                headwindSpeed = RelativeWind.headwindComponent(row.relativeAngle, row.windMs),
+                beyondHorizon = false,
+            )
+        }
         val wet = points.filter { it.sample.precip >= RouteForecast.WET_THRESHOLD_MM }
         return RouteForecast(
             routeName = "Morning loop",

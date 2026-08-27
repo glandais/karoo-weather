@@ -10,8 +10,8 @@ import io.github.glandais.karoo.weather.domain.WindUnit
  * The Compose twin of `datatypes/views/FieldChrome`'s label helpers.
  *
  * The enums carry no resource name on purpose: resolving one at runtime needs the deprecated
- * `Resources.getIdentifier()`, which the release build's R8 resource shrinking breaks (PLAN WP5).
- * A `when` over the enum keeps every id a compile-time constant and therefore reachable.
+ * `Resources.getIdentifier()`, which the release build's R8 resource shrinking breaks (PLAN WP5). A
+ * `when` over the enum keeps every id a compile-time constant and therefore reachable.
  */
 @StringRes
 fun windUnitLabel(unit: WindUnit): Int =

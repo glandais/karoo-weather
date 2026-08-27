@@ -57,8 +57,8 @@ enum class WindLayout {
  * the rider's own frame, so straight up is a pure tailwind. Its colour follows the headwind ramp
  * and is the only green on the device (DESIGN §3.2).
  *
- * @param bearing GPS bearing, degrees true. Null falls back to the meteorological frame, where
- *   "up" means the wind is blowing north.
+ * @param bearing GPS bearing, degrees true. Null falls back to the meteorological frame, where "up"
+ *   means the wind is blowing north.
  */
 @Composable
 fun WindView(

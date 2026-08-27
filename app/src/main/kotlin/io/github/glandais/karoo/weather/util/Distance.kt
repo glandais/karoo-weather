@@ -46,7 +46,9 @@ object Numbers {
     fun wind(ms: Double, units: Units, locale: Locale = Locale.getDefault()): String =
         String.format(locale, "%d", units.wind(ms).roundToInt())
 
-    /** `2.1` — precipitation always carries one decimal; `0.0` is meaningfully different from `0.4`. */
+    /**
+     * `2.1` — precipitation always carries one decimal; `0.0` is meaningfully different from `0.4`.
+     */
     fun mm(millimetres: Double, locale: Locale = Locale.getDefault()): String =
         String.format(locale, "%.1f", millimetres)
 

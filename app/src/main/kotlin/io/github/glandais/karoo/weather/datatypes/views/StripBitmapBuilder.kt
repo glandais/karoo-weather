@@ -188,8 +188,7 @@ object StripBitmapBuilder {
     }
 
     /** Temperature as whole degrees in the rider's unit, e.g. `22°`. */
-    fun formatTemp(celsius: Double, units: Units): String =
-        "${units.temp(celsius).roundToInt()}°"
+    fun formatTemp(celsius: Double, units: Units): String = "${units.temp(celsius).roundToInt()}°"
 
     private fun baseline(row: Int, rowHeight: Float, paint: Paint): Float {
         val centreY = row * rowHeight + rowHeight / 2f

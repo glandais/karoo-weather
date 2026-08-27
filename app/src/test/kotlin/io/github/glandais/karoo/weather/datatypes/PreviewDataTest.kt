@@ -47,7 +47,8 @@ class PreviewDataTest {
 
     @Test
     fun `route crosses at least two temperature ramp buckets`() {
-        val ramps: Set<ColorPair> = PreviewData.route.points.map { Wx.forTemp(it.sample.temp) }.toSet()
+        val ramps: Set<ColorPair> =
+            PreviewData.route.points.map { Wx.forTemp(it.sample.temp) }.toSet()
         assertTrue("route temperatures must span more than one ramp bucket", ramps.size >= 2)
     }
 
@@ -80,8 +81,7 @@ class PreviewDataTest {
                 RelativeWind.headwindComponent(point.relativeWindAngle, point.sample.windSpeed)
             assertEquals(expected, point.headwindSpeed, 1e-9)
             // And the angle really is recoverable from the meteorological direction we stored.
-            val recovered =
-                RelativeWind.relativeAngle(point.routeBearing, point.sample.windDir)
+            val recovered = RelativeWind.relativeAngle(point.routeBearing, point.sample.windDir)
             assertTrue(abs(recovered - point.relativeWindAngle) < 1e-6)
         }
     }

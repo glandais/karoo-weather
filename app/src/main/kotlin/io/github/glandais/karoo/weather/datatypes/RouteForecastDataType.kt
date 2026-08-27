@@ -6,8 +6,8 @@ import androidx.compose.ui.unit.DpSize
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
-import androidx.glance.action.clickable
 import androidx.glance.action.actionStartActivity
+import androidx.glance.action.clickable
 import androidx.glance.appwidget.ExperimentalGlanceRemoteViewsApi
 import androidx.glance.appwidget.GlanceRemoteViews
 import androidx.glance.layout.ContentScale
@@ -62,49 +62,47 @@ class RouteForecastDataType(private val context: Context, private val repo: Weat
         val night = FieldChrome.night(context)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-        val configJob =
-            scope.launch {
-                emitter.onNext(UpdateGraphicConfig(showHeader = false))
-                emitter.onNext(FieldChrome.clearState())
+        scope.launch {
+            emitter.onNext(UpdateGraphicConfig(showHeader = false))
+            emitter.onNext(FieldChrome.clearState())
+            awaitCancellation()
+        }
+
+        scope.launch {
+            if (config.preview) {
+                render(
+                    glance,
+                    context,
+                    config,
+                    PreviewData.route,
+                    PreviewData.hourly,
+                    PreviewData.snapshot.units,
+                    night,
+                    emitter,
+                )
                 awaitCancellation()
             }
-
-        val viewJob =
-            scope.launch {
-                if (config.preview) {
-                    render(
-                        glance,
-                        context,
-                        config,
-                        PreviewData.route,
-                        PreviewData.hourly,
-                        PreviewData.snapshot.units,
-                        night,
-                        emitter,
-                    )
-                    awaitCancellation()
-                }
-                val refreshMs = FieldLoop.refreshMs(repo.karooOrNull, repo)
-                FieldLoop.flow(repo.karooOrNull, repo, dataTypeId).throttle(refreshMs).collect {
-                    data ->
-                    if (!data.visible) return@collect
-                    emitter.onNext(FieldLoop.customState(context, data.snapshot, night))
-                    render(
-                        glance,
-                        context,
-                        config,
-                        repo.routeForecast(),
-                        hourlyOf(data.snapshot),
-                        data.snapshot.units,
-                        night,
-                        emitter,
-                    )
-                }
+            val refreshMs = FieldLoop.refreshMs(repo.karooOrNull, repo)
+            FieldLoop.flow(repo.karooOrNull, repo, dataTypeId).throttle(refreshMs).collect { data ->
+                if (!data.visible) return@collect
+                emitter.onNext(FieldLoop.customState(context, data.snapshot, night))
+                render(
+                    glance,
+                    context,
+                    config,
+                    repo.routeForecast(),
+                    hourlyOf(data.snapshot),
+                    data.snapshot.units,
+                    night,
+                    emitter,
+                )
             }
+        }
 
+        // Cancelling the scope, not the two jobs individually: it releases the parent
+        // SupervisorJob too, so nothing survives a stopView.
         emitter.setCancellable {
-            configJob.cancel()
-            viewJob.cancel()
+            scope.cancel()
         }
     }
 
