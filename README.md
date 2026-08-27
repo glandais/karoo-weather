@@ -52,15 +52,15 @@ the consent dialog on first launch.
 
 ## Screenshots
 
-<!-- TODO: replace with real captures from a Karoo. -->
+Companion app on a Karoo (480×800). Data-field captures will be added once fields are recorded on a ride page.
 
-| Weather now | Wind | Rain next 2 h |
+| Now | Route | Settings |
 |---|---|---|
-| _screenshot placeholder_ | _screenshot placeholder_ | _screenshot placeholder_ |
+| ![Now](docs/screenshots/now.png) | ![Route](docs/screenshots/route.png) | ![Settings](docs/screenshots/settings.png) |
 
-| Route forecast | Map layer | Companion app |
-|---|---|---|
-| _screenshot placeholder_ | _screenshot placeholder_ | _screenshot placeholder_ |
+## Documentation
+
+Research, architecture and design documents live in [docs/](docs/README.md).
 
 ## Install
 
