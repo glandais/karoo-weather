@@ -363,7 +363,7 @@ class WeatherRepository(
             remaining != null &&
                 System.currentTimeMillis() - distanceToDestinationAtMs < DISTANCE_STREAM_STALE_MS
         val candidate =
-            if (fresh && remaining != null) {
+            if (fresh) {
                 context.routeDistance - remaining
             } else {
                 rawPosition.value?.let { context.path.nearestDistanceTo(it) }

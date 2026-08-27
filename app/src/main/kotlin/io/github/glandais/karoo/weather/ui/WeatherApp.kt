@@ -13,9 +13,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -85,7 +85,7 @@ private fun WeatherAppContent(viewModel: WeatherViewModel, onClose: () -> Unit) 
         contentColor = MaterialTheme.colorScheme.onBackground,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            TabRow(selectedTabIndex = selected, modifier = Modifier.height(56.dp)) {
+            PrimaryTabRow(selectedTabIndex = selected, modifier = Modifier.height(56.dp)) {
                 AppTab.entries.forEachIndexed { index, tab ->
                     Tab(
                         selected = index == selected,
