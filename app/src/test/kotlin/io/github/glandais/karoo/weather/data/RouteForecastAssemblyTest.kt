@@ -102,7 +102,24 @@ class RouteForecastAssemblyTest {
 
         assertEquals(20_000.0, forecast.firstWetDistance!!, 1e-9)
         assertEquals(forecast.points[2].eta, forecast.firstWetEta)
-        assertEquals(2.0, forecast.totalPrecipMm, 1e-9)
+        // Only the wet 20 km point opens a leg (10 km at 10 m/s = 1000 s), and its hour's 0.6 mm
+        // is worth 1000/3600 of an hour of riding. Summing raw `precip` claimed 2.0 mm.
+        assertEquals(0.6 * 1000 / 3600.0, forecast.totalPrecipMm, 1e-9)
+    }
+
+    @Test
+    fun `points sharing one forecast hour do not each add that hour's rain`() {
+        // Five points 1 km apart at 10 m/s are 100 s apart: all well inside one forecast hour, each
+        // carrying that hour's full 4 mm accumulation.
+        val samples = samples(6_000.0, 7_000.0, 8_000.0, 9_000.0)
+        val forecast = build(samples, forecasts = List(5) { forecast(sample(precip = 4.0)) })
+
+        // Four legs of 100 s: 4 mm/h for 400 s, not 5 x 4 mm.
+        assertEquals(4.0 * 400 / 3600.0, forecast.totalPrecipMm, 1e-9)
+        assertTrue(
+            "a 20 mm total would be four times the real rainfall",
+            forecast.totalPrecipMm < 1.0,
+        )
     }
 
     @Test
@@ -211,5 +228,37 @@ class RouteForecastAssemblyTest {
 
     private companion object {
         const val SPEED_MS = 10.0
+    }
+
+    @Test
+    fun `progress converts out of routeDistance space before it measures a path`() {
+        // The SDK's routeDistance runs 1 % long against our own haversine sum of the polyline.
+        val pathLength = 100_000.0
+        val routeDistance = 101_000.0
+
+        assertEquals(0.0, WeatherRepository.pathDistance(0.0, routeDistance, pathLength), 1e-9)
+        assertEquals(
+            50_000.0,
+            WeatherRepository.pathDistance(50_500.0, routeDistance, pathLength),
+            1e-9,
+        )
+        // At the finish it lands ON the path end, not a kilometre past it — which is what used to
+        // make `RouteSampler` return nothing for the last kilometre of a route.
+        assertEquals(
+            pathLength,
+            WeatherRepository.pathDistance(routeDistance, routeDistance, pathLength),
+            1e-9,
+        )
+        assertTrue(
+            WeatherRepository.pathDistance(routeDistance, routeDistance, pathLength) <= pathLength
+        )
+        // Degenerate inputs never escape the path.
+        assertEquals(0.0, WeatherRepository.pathDistance(10.0, routeDistance, 0.0), 1e-9)
+        assertEquals(500.0, WeatherRepository.pathDistance(500.0, 0.0, pathLength), 1e-9)
+        assertEquals(
+            0.0,
+            WeatherRepository.pathDistance(Double.NaN, routeDistance, pathLength),
+            1e-9,
+        )
     }
 }

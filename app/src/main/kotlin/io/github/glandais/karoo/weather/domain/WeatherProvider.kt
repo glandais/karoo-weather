@@ -51,5 +51,18 @@ interface WeatherProvider {
     val id: String
 
     /** Returns one [LocationForecast] per requested point, in request order. */
-    suspend fun fetch(request: WeatherRequest): Result<List<LocationForecast>>
+    suspend fun fetch(request: WeatherRequest): Result<ForecastFetch>
 }
+
+/**
+ * One successful fetch cycle: the forecasts, plus whatever went wrong with the *optional* parts.
+ *
+ * It is a `List<LocationForecast>` by delegation because that is what every caller wants; the extra
+ * [nowcastError] exists so a rate limit on the nowcast request is not silently swallowed — the
+ * scheduler must honour its `Retry-After` even though the cycle as a whole succeeded.
+ */
+class ForecastFetch(
+    val forecasts: List<LocationForecast>,
+    /** Error from the optional nowcast request, or null. Never fatal to the cycle. */
+    val nowcastError: WeatherError? = null,
+) : List<LocationForecast> by forecasts

@@ -28,6 +28,9 @@ object StripBitmapBuilder {
     /** Opacity of the wet-cell wash, DESIGN §3.4. */
     const val WET_WASH_ALPHA = 31 // 12 % of 255
 
+    /** Share of a cell its text may occupy before it is shrunk to fit. */
+    const val CELL_TEXT_RATIO = 0.92f
+
     data class Column(
         @DrawableRes val icon: Int,
         val tempC: Double,
@@ -64,10 +67,11 @@ object StripBitmapBuilder {
         night: Boolean,
         textSizeSp: Int,
         units: Units,
+        reuse: Bitmap? = null,
     ): Bitmap {
         val width = widthPx.coerceAtLeast(1)
         val height = heightPx.coerceAtLeast(1)
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bitmap = surface(reuse, width, height)
         val canvas = Canvas(bitmap)
         if (columns.isEmpty() || rows.count == 0) return bitmap
 
@@ -100,6 +104,20 @@ object StripBitmapBuilder {
                     )
             }
 
+        // Neither paint's size is bounded by the CELL width, only by the row height, and
+        // `drawText` neither wraps nor ellipsises: at (60,30) "+0.0 km" is ~113 px in a 96 px cell
+        // and would be painted straight over its neighbour. Each row is fitted to its own widest
+        // string, once, so every column keeps the same size (DESIGN §1.3).
+        val cellText = cellWidth * CELL_TEXT_RATIO
+        val floor = sp(FieldChrome.MIN_LABEL_SP)
+        val tempTexts = columns.map { formatTemp(it.tempC, units) }
+        val beyond = context.getString(R.string.horizon_beyond)
+        val labelTexts =
+            columns.map { if (it.beyondHorizon) beyond else it.label } +
+                columns.mapNotNull { it.etaLabel }
+        if (rows.temp) fitToCell(tempPaint, tempTexts, cellText, floor)
+        if (rows.label || rows.eta) fitToCell(labelPaint, labelTexts, cellText, floor)
+
         val wash = Paint().apply { color = withAlpha(Wx.rainMed.pick(night), WET_WASH_ALPHA) }
 
         val divider = Paint().apply { color = dividerColour }
@@ -108,6 +126,10 @@ object StripBitmapBuilder {
         columns.forEachIndexed { index, column ->
             val left = index * cellWidth
             val centreX = left + cellWidth / 2f
+            // Belt and braces below the legibility floor: a string that cannot be shrunk any
+            // further is clipped to its own cell rather than drawn over the next one.
+            canvas.save()
+            canvas.clipRect(left, 0f, left + cellWidth, height.toFloat())
 
             if (column.wet) {
                 canvas.drawRect(left, 0f, left + cellWidth, height.toFloat(), wash)
@@ -167,9 +189,7 @@ object StripBitmapBuilder {
 
             if (rows.label) {
                 labelPaint.color = if (column.beyondHorizon) muted else fg
-                val text =
-                    if (column.beyondHorizon) context.getString(R.string.horizon_beyond)
-                    else column.label
+                val text = if (column.beyondHorizon) beyond else column.label
                 canvas.drawText(text, centreX, baseline(row, rowHeight, labelPaint), labelPaint)
                 row++
             }
@@ -182,9 +202,27 @@ object StripBitmapBuilder {
                 }
                 row++
             }
+
+            canvas.restore()
         }
 
         return bitmap
+    }
+
+    /** Shrinks [paint] until its widest string fits [maxWidth], never below [minSize]. */
+    private fun fitToCell(paint: Paint, texts: List<String>, maxWidth: Float, minSize: Float) {
+        val widest = texts.maxOfOrNull { paint.measureText(it) } ?: return
+        if (widest <= maxWidth || widest <= 0f) return
+        paint.textSize = (paint.textSize * maxWidth / widest).coerceAtLeast(minSize)
+    }
+
+    /** [reuse] erased when it already has the right geometry, else a fresh bitmap. */
+    private fun surface(reuse: Bitmap?, width: Int, height: Int): Bitmap {
+        if (reuse != null && !reuse.isRecycled && reuse.width == width && reuse.height == height) {
+            reuse.eraseColor(Color.TRANSPARENT)
+            return reuse
+        }
+        return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     }
 
     /** Temperature as whole degrees in the rider's unit, e.g. `22°`. */
@@ -241,6 +279,25 @@ object RouteStripLayout {
                     eta = true,
                 )
         }
+    }
+
+    /**
+     * Which of [size] route points the [count] columns show: evenly spread by index, index 0 (the
+     * rider) always first and the last point always last.
+     *
+     * Taking the first [count] instead would cover only the four nearest spacings of a route
+     * sampled over its whole remaining length — the map layer already spreads its own selection,
+     * and the two must not disagree about the same data.
+     */
+    fun columnIndices(size: Int, count: Int): List<Int> {
+        if (size <= 0 || count <= 0) return emptyList()
+        if (size <= count) return (0 until size).toList()
+        if (count == 1) return listOf(0)
+        val indices = LinkedHashSet<Int>()
+        for (i in 0 until count) {
+            indices.add((i.toDouble() * (size - 1) / (count - 1)).roundToInt())
+        }
+        return indices.toList()
     }
 
     /** The ceiling on columns for this `gridSize`, before `viewSize` narrows it further. */

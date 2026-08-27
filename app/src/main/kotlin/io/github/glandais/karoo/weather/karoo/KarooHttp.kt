@@ -59,6 +59,10 @@ class KarooHttpGateway(
             karoo.addConsumer(
                 params = request,
                 onError = { message -> close(TransportException(transportError(message))) },
+                // Without this the SDK only logs "Unhandled complete" and drops the consumer: the
+                // channel would stay open and `first()` would wait out the whole 20 s timeout for a
+                // request the transport has already given up on.
+                onComplete = { close() },
             ) { event: OnHttpResponse ->
                 val state = event.state
                 if (state is HttpResponseState.Complete) {

@@ -99,6 +99,12 @@ class WeatherRepository(
     // ---- live inputs ------------------------------------------------------------------------
 
     private val rawPosition = MutableStateFlow<GeoPoint?>(null)
+
+    /** [rawPosition] snapped to the privacy grid WITH hysteresis; the only gridded position. */
+    private val gridPosition = MutableStateFlow<GeoPoint?>(null)
+
+    @Volatile private var gridKm: Double = Double.NaN
+
     private val routeContext = MutableStateFlow<RouteContext?>(null)
     private val rideState = MutableStateFlow<RideState>(RideState.Idle)
     private val rideProfile = MutableStateFlow<RideProfile?>(null)
@@ -123,6 +129,18 @@ class WeatherRepository(
 
     @Volatile private var navigationSeen: Boolean = false
 
+    private val connectedState = MutableStateFlow(false)
+
+    /**
+     * True once `KarooSystemService.connect` has reported a live binding.
+     *
+     * The fields need it because `hardwareType` — and therefore the effective repaint interval — is
+     * null until the service connects (karoo-headwind pitfall #1), and a view that latched the "not
+     * connected yet" interval would keep it for its whole life.
+     */
+    val connected: StateFlow<Boolean>
+        get() = connectedState
+
     private val settingsState: StateFlow<WeatherSettings> =
         settingsStore.settings.stateIn(repoScope, SharingStarted.Eagerly, WeatherSettings())
 
@@ -146,6 +164,7 @@ class WeatherRepository(
                     error = fetchStatus.error,
                     lastSuccessAt = fetchStatus.lastSuccessAt ?: bundle?.fetchedAt,
                     consentAccepted = currentSettings.consentAccepted,
+                    hasLiveRoute = fetchStatus.routeLive,
                 )
             }
             .stateIn(repoScope, SharingStarted.Eagerly, WeatherSnapshot())
@@ -157,23 +176,22 @@ class WeatherRepository(
      * [KarooSystemService] and starts the session jobs.
      */
     fun attach() {
-        val first =
-            synchronized(attachLock) {
-                refCount += 1
-                refCount == 1
-            }
-        if (first) startSession()
+        // The session start/stop happens INSIDE the monitor: deciding under the lock and acting
+        // outside it lets a preempted detach() tear down a session a concurrent attach() just
+        // built.
+        synchronized(attachLock) {
+            refCount += 1
+            if (refCount == 1) startSession()
+        }
     }
 
     /** On the LAST detach: cancels the session scope and disconnects the service. */
     fun detach() {
-        val last =
-            synchronized(attachLock) {
-                if (refCount == 0) return
-                refCount -= 1
-                refCount == 0
-            }
-        if (last) stopSession()
+        synchronized(attachLock) {
+            if (refCount == 0) return
+            refCount -= 1
+            if (refCount == 0) stopSession()
+        }
     }
 
     private fun startSession() {
@@ -186,7 +204,10 @@ class WeatherRepository(
         launchCollectors(scope, system)
         launchTriggerProducer(scope)
         launchFetchWorker(scope)
-        system.connect { connected -> if (connected) scope.launch { requestRefresh() } }
+        system.connect { isConnected ->
+            connectedState.value = isConnected
+            if (isConnected) scope.launch { requestRefresh() }
+        }
     }
 
     private fun stopSession() {
@@ -195,6 +216,7 @@ class WeatherRepository(
         karoo?.let { runCatching { it.disconnect() } }
         karoo = null
         provider = null
+        connectedState.value = false
         refreshKeys.value = null
         status.update { it.copy(loading = false) }
     }
@@ -240,7 +262,14 @@ class WeatherRepository(
 
     private suspend fun onLocation(point: GeoPoint) {
         rawPosition.value = point
-        val rounded = Geo.roundToGrid(point, settingsState.value.roundLocationKm)
+        val km = settingsState.value.roundLocationKm
+        // Hysteresis: a road that hugs a grid line would otherwise flip the cell on every fix, and
+        // every flip publishes a new refresh key that cancels the in-flight fetch (ARCHITECTURE
+        // §5.1). The previous cell is only left once the rider is clearly past its boundary.
+        val previous = if (km == gridKm) gridPosition.value else null
+        val rounded = Geo.roundToGridSticky(previous, point, km)
+        gridKm = km
+        gridPosition.value = rounded
         status.update { if (it.position == rounded) it else it.copy(position = rounded) }
         val now = System.currentTimeMillis()
         if (now - lastPositionSaveMs >= POSITION_SAVE_INTERVAL_MS) {
@@ -295,14 +324,26 @@ class WeatherRepository(
         val previous = routeContext.value
         if (previous?.key == context?.key) {
             routeContext.value = context
+            publishRouteLive()
             return
         }
         routeContext.value = context
+        publishRouteLive()
         etaModel.reset()
         lastProgress = null
         progress.value = 0.0
         distanceToDestination = null
         distanceToDestinationAtMs = 0L
+    }
+
+    /**
+     * Publishes the guard [routeForecast] applies, so that everything reading [state] — the route
+     * strip AND the map layer — sees the same truth: a finished route stops being drawn the moment
+     * navigation goes Idle, not when the next fetch happens to succeed.
+     */
+    private fun publishRouteLive() {
+        val live = routeContext.value != null || !navigationSeen
+        status.update { if (it.routeLive == live) it else it.copy(routeLive = live) }
     }
 
     /**
@@ -328,8 +369,10 @@ class WeatherRepository(
                 rawPosition.value?.let { context.path.nearestDistanceTo(it) }
             }
         if (candidate == null || !candidate.isFinite()) return
-        val ceiling = max(context.routeDistance, context.path.length)
-        val clamped = candidate.coerceIn(0.0, ceiling)
+        // Progress lives in the SDK's routeDistance space and is clamped by it alone; the decoded
+        // polyline's own length is a DIFFERENT measure and is applied by [pathDistance] at the
+        // point progress is handed to a path-space API.
+        val clamped = candidate.coerceIn(0.0, context.routeDistance)
         val previous = lastProgress
         val next =
             if (previous != null && clamped < previous - MAX_PROGRESS_REGRESSION_M) {
@@ -346,7 +389,7 @@ class WeatherRepository(
     /** Never suspends on I/O: it only ever writes the latest key into a conflating state flow. */
     private fun launchTriggerProducer(scope: CoroutineScope) {
         scope.launch {
-            combine(settingsState, rawPosition, routeContext, rideProfile, progress) {
+            combine(settingsState, gridPosition, routeContext, rideProfile, progress) {
                     currentSettings,
                     position,
                     route,
@@ -376,6 +419,10 @@ class WeatherRepository(
                 while (isActive) {
                     awaitMinGap()
                     status.update { it.copy(loading = true) }
+                    // Recorded BEFORE the attempt: `collectLatest` cancels an in-flight fetch on
+                    // every new key, and only a start-time gap can stop a jittering key from
+                    // restarting the request forever without one ever completing.
+                    lastFetchAtSec = nowSec()
                     val error = runFetch(budget)
                     val now = nowSec()
                     lastFetchAtSec = now
@@ -393,7 +440,13 @@ class WeatherRepository(
                             attempt = 0
                             delay(RefreshPolicy.intervalSec(settingsState.value, recording).seconds)
                         }
-                        !error.retryable -> return@collectLatest
+                        // A non-retryable error (one truncated body, one 4xx) is permanent for THIS
+                        // request, not for the session: retrying it at the normal cadence keeps the
+                        // periodic refresh alive without hammering the endpoint.
+                        !error.retryable -> {
+                            attempt = 0
+                            delay(RefreshPolicy.intervalSec(settingsState.value, recording).seconds)
+                        }
                         else -> {
                             attempt += 1
                             delay(retryDelaySec(error, attempt, recording).seconds)
@@ -425,7 +478,7 @@ class WeatherRepository(
         val raw = rawPosition.value ?: return WeatherError.NoConnection
         // Only the rider's own point is privacy-rounded: the route's own geometry is already on the
         // device, and a 3 km grid would collapse 1 km route samples onto each other.
-        val rider = Geo.roundToGrid(raw, currentSettings.roundLocationKm)
+        val rider = gridPosition.value ?: Geo.roundToGrid(raw, currentSettings.roundLocationKm)
         val now = nowSec()
         val context = routeContext.value
         val recording = isRecording()
@@ -439,7 +492,12 @@ class WeatherRepository(
         if (context != null) {
             val maxRoutePoints = (pointBudget - 1).coerceIn(0, RouteSampler.MAX_ROUTE_POINTS)
             if (maxRoutePoints > 0) {
-                val all = RouteSampler.sample(context.path, currentProgress, maxRoutePoints)
+                // `RouteSampler` measures along the decoded polyline, so progress must be converted
+                // out of the SDK's routeDistance space first — otherwise a routeDistance that runs
+                // 1 % long clamps `from` to `path.length` and the last kilometre samples nothing.
+                val pathProgress =
+                    pathDistance(currentProgress, context.routeDistance, context.path.length)
+                val all = RouteSampler.sample(context.path, pathProgress, maxRoutePoints)
                 val truncated = RouteSampler.truncateToHorizon(all, eta, now)
                 samples = truncated.first
                 markerIndex = truncated.second
@@ -450,10 +508,11 @@ class WeatherRepository(
         val request =
             WeatherRequest(points = points, forecastHours = FORECAST_HOURS, includeNowcast = true)
         val result = weatherProvider.fetch(request)
-        val forecasts = result.getOrElse { failure ->
+        val fetched = result.getOrElse { failure ->
             return (failure as? WeatherErrorException)?.error
                 ?: WeatherError.Parse(failure.message ?: "unknown")
         }
+        val forecasts = fetched.forecasts
         if (forecasts.isEmpty()) return WeatherError.EmptyBody
 
         val route =
@@ -485,7 +544,10 @@ class WeatherRepository(
         )
         cache.savePosition(rider)
         lastPositionSaveMs = System.currentTimeMillis()
-        return null
+        // The cycle's data stands on its own and is cached above; only a rate limit on the optional
+        // nowcast request survives, so its `Retry-After` reaches the backoff ladder instead of the
+        // worker issuing a fresh 429 on every normal interval.
+        return fetched.nowcastError as? WeatherError.RateLimited
     }
 
     // ---- public reads --------------------------------------------------------------------------
@@ -507,8 +569,9 @@ class WeatherRepository(
 
     /** Non-null only while a route is loaded and a forecast exists for it. */
     fun routeForecast(): RouteForecast? {
-        val route = state.value.bundle?.route ?: return null
-        if (navigationSeen && routeContext.value == null) return null
+        val snapshot = state.value
+        val route = snapshot.bundle?.route ?: return null
+        if (!snapshot.hasLiveRoute) return null
         return route
     }
 
@@ -545,6 +608,8 @@ class WeatherRepository(
         val lastSuccessAt: Long? = null,
         val position: GeoPoint? = null,
         val bearing: Double? = null,
+        /** False once navigation has ended: the cached route must stop being drawn. */
+        val routeLive: Boolean = true,
     )
 
     private data class RouteContext(
@@ -556,13 +621,14 @@ class WeatherRepository(
 
     private data class TriggerInputs(
         val settings: WeatherSettings,
+        /** ALREADY on the privacy grid, with hysteresis applied (see `onLocation`). */
         val position: GeoPoint?,
         val route: RouteContext?,
         val profile: RideProfile?,
         val progress: Double,
     ) {
         fun toKey(): RefreshKey {
-            val rounded = position?.let { Geo.roundToGrid(it, settings.roundLocationKm) }
+            val rounded = position
             val spacing = route?.let {
                 RouteSampler.spacingFor((it.routeDistance - progress).coerceAtLeast(0.0))
             }
@@ -616,6 +682,35 @@ class WeatherRepository(
         const val WET_PROBABILITY_PERCENT = 60
 
         /**
+         * A distance measured in the SDK's `routeDistance` space, expressed along [pathLength] —
+         * our own haversine sum over the decoded polyline. The two disagree by the polyline's
+         * simplification error, so mixing them silently truncates sampling near the finish.
+         */
+        fun pathDistance(progress: Double, routeDistance: Double, pathLength: Double): Double {
+            if (!progress.isFinite() || pathLength <= 0.0) return 0.0
+            if (routeDistance <= 0.0) return progress.coerceIn(0.0, pathLength)
+            return (progress * pathLength / routeDistance).coerceIn(0.0, pathLength)
+        }
+
+        /**
+         * Precipitation the rider actually rides through, mm.
+         *
+         * [WeatherSample.precip] is an accumulation over the sample's whole forecast hour, not a
+         * level, so summing it over route points counts one hour of rain once per point that falls
+         * inside it. Each leg is therefore weighted by the time it takes to ride, and the final
+         * point closes the route rather than opening another leg.
+         */
+        fun accumulatedPrecipMm(points: List<RoutePointForecast>): Double {
+            if (points.size < 2) return 0.0
+            var total = 0.0
+            for (i in 0 until points.size - 1) {
+                val seconds = (points[i + 1].eta - points[i].eta).coerceAtLeast(0L)
+                total += points[i].sample.precip * seconds / HOUR_SEC.toDouble()
+            }
+            return total
+        }
+
+        /**
          * The pure assembly step, extracted so it is unit-testable without a `Context`.
          *
          * [samples] are ROUTE samples only; this function PREPENDS the rider's own point as index 0
@@ -636,6 +731,7 @@ class WeatherRepository(
             assumedSpeedMs: Double,
         ): RouteForecast {
             val points = ArrayList<RoutePointForecast>(samples.size + 1)
+            val pathProgress = pathDistance(progress, routeDistance, path.length)
 
             forecasts.firstOrNull()?.let { here ->
                 val sample = Interpolation.sampleAt(here.hourly, nowSec) ?: here.current
@@ -645,7 +741,7 @@ class WeatherRepository(
                             point = riderPoint,
                             distanceAlong = progress,
                             eta = nowSec,
-                            routeBearing = path.bearingAt(progress),
+                            routeBearing = path.bearingAt(pathProgress),
                             sample = sample,
                             beyondHorizon = false,
                         )
@@ -680,7 +776,7 @@ class WeatherRepository(
                 computedAt = nowSec,
                 assumedSpeed = assumedSpeedMs,
                 points = points.toList(),
-                totalPrecipMm = points.sumOf { it.sample.precip },
+                totalPrecipMm = accumulatedPrecipMm(points),
                 firstWetDistance = wet?.distanceAlong,
                 firstWetEta = wet?.eta,
             )

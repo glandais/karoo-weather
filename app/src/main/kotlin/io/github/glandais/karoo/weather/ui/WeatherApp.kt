@@ -108,7 +108,12 @@ private fun WeatherAppContent(viewModel: WeatherViewModel, onClose: () -> Unit) 
                             nowSec = nowSec,
                             onRefresh = viewModel::refresh,
                         )
-                    AppTab.ROUTE -> RouteScreen(snapshot = snapshot)
+                    AppTab.ROUTE ->
+                        RouteScreen(
+                            snapshot = snapshot,
+                            nowSec = nowSec,
+                            onRefresh = viewModel::refresh,
+                        )
                     AppTab.SETTINGS ->
                         SettingsScreen(settings = settings, onUpdate = viewModel::update)
                 }

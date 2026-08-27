@@ -174,7 +174,13 @@ fun CurrentCard(
                     )
                 }
                 Text(
-                    text = stringResource(R.string.rain_total_2h, Numbers.mm(rainNext2hMm)),
+                    // Both the nowcast and the Now tab's hourly fallback span two hours here.
+                    text =
+                        stringResource(
+                            R.string.rain_total_window,
+                            Numbers.mm(rainNext2hMm),
+                            TWO_HOUR_WINDOW,
+                        ),
                     style = MaterialTheme.typography.bodyMedium,
                     fontFamily = FontFamily.Default,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -185,4 +191,6 @@ fun CurrentCard(
 }
 
 /** The two-hour nowcast is eight quarter-hours; `Wx.forRain` wants one of them. */
+private const val TWO_HOUR_WINDOW = "2"
+
 private const val NOWCAST_BUCKETS_PER_2H = 8.0

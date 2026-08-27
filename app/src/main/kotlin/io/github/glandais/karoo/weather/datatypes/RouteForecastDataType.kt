@@ -15,6 +15,7 @@ import androidx.glance.layout.fillMaxSize
 import io.github.glandais.karoo.weather.MainActivity
 import io.github.glandais.karoo.weather.R
 import io.github.glandais.karoo.weather.data.WeatherRepository
+import io.github.glandais.karoo.weather.datatypes.views.BitmapSurface
 import io.github.glandais.karoo.weather.datatypes.views.FieldChrome
 import io.github.glandais.karoo.weather.datatypes.views.GlanceChrome
 import io.github.glandais.karoo.weather.datatypes.views.RouteStripLayout
@@ -25,7 +26,9 @@ import io.github.glandais.karoo.weather.domain.RouteForecast
 import io.github.glandais.karoo.weather.domain.Units
 import io.github.glandais.karoo.weather.domain.WeatherSample
 import io.github.glandais.karoo.weather.domain.WeatherSnapshot
-import io.github.glandais.karoo.weather.karoo.throttle
+import io.github.glandais.karoo.weather.karoo.safeNext
+import io.github.glandais.karoo.weather.karoo.safeUpdate
+import io.github.glandais.karoo.weather.karoo.throttleEach
 import io.github.glandais.karoo.weather.weather.Interpolation
 import io.github.glandais.karoo.weather.weather.WmoIcons
 import io.hammerhead.karooext.extension.DataTypeImpl
@@ -61,14 +64,16 @@ class RouteForecastDataType(private val context: Context, private val repo: Weat
         val glance = GlanceRemoteViews()
         val night = FieldChrome.night(context)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        // Per-startView state: a full-field bitmap is ~1.5 MB and this loop repaints every few
+        // seconds for the whole ride (see BitmapSurface).
+        val surface = BitmapSurface()
 
+        // ONE coroutine: the cleared state must land BEFORE the loop's first custom state, and two
+        // coroutines on Dispatchers.IO give no such ordering (a lost race blanks the field).
         scope.launch {
-            emitter.onNext(UpdateGraphicConfig(showHeader = false))
-            emitter.onNext(FieldChrome.clearState())
-            awaitCancellation()
-        }
+            if (!emitter.safeNext(UpdateGraphicConfig(showHeader = false))) return@launch
+            if (!emitter.safeNext(FieldChrome.clearState())) return@launch
 
-        scope.launch {
             if (config.preview) {
                 render(
                     glance,
@@ -78,34 +83,43 @@ class RouteForecastDataType(private val context: Context, private val repo: Weat
                     PreviewData.hourly,
                     PreviewData.snapshot.units,
                     night,
+                    surface,
                     emitter,
                 )
                 awaitCancellation()
             }
-            val refreshMs = FieldLoop.refreshMs(repo.karooOrNull, repo)
-            FieldLoop.flow(repo.karooOrNull, repo, dataTypeId).throttle(refreshMs).collect { data ->
-                if (!data.visible) return@collect
-                emitter.onNext(FieldLoop.customState(context, data.snapshot, night))
-                render(
-                    glance,
-                    context,
-                    config,
-                    repo.routeForecast(),
-                    hourlyOf(data.snapshot),
-                    data.snapshot.units,
-                    night,
-                    emitter,
-                )
-            }
+            FieldLoop.flow(repo.karooOrNull, repo, dataTypeId)
+                .throttleEach { it.refreshMs }
+                .collect { data ->
+                    if (!data.visible) return@collect
+                    if (!emitter.safeNext(FieldLoop.customState(context, data.snapshot, night))) {
+                        scope.cancel()
+                        return@collect
+                    }
+                    val ok =
+                        render(
+                            glance,
+                            context,
+                            config,
+                            repo.routeForecast(),
+                            hourlyOf(data.snapshot),
+                            data.snapshot.units,
+                            night,
+                            surface,
+                            emitter,
+                        )
+                    if (!ok) scope.cancel()
+                }
         }
 
-        // Cancelling the scope, not the two jobs individually: it releases the parent
-        // SupervisorJob too, so nothing survives a stopView.
+        // Cancelling the scope releases the parent SupervisorJob too, so nothing survives stopView.
         emitter.setCancellable {
             scope.cancel()
+            surface.release()
         }
     }
 
+    /** False when the host emitter is gone and this view must stop. */
     private suspend fun render(
         glance: GlanceRemoteViews,
         context: Context,
@@ -114,8 +128,9 @@ class RouteForecastDataType(private val context: Context, private val repo: Weat
         hourly: List<WeatherSample>,
         units: Units,
         night: Boolean,
+        surface: BitmapSurface,
         emitter: ViewEmitter,
-    ) {
+    ): Boolean {
         val rows = RouteStripLayout.rowsFor(config)
         val maxColumns = RouteStripLayout.maxColumnsFor(config)
         val count = FieldChrome.columnsFor(config.viewSize, maxColumns)
@@ -125,7 +140,7 @@ class RouteForecastDataType(private val context: Context, private val repo: Weat
             } else {
                 clockColumns(hourly, count)
             }
-        if (columns.isEmpty()) return
+        if (columns.isEmpty()) return true
 
         val width = config.viewSize.first.coerceIn(MIN_PX, MAX_PX)
         val height = config.viewSize.second.coerceIn(MIN_PX, MAX_PX)
@@ -139,7 +154,9 @@ class RouteForecastDataType(private val context: Context, private val repo: Weat
                 night = night,
                 textSizeSp = config.textSize,
                 units = units,
+                reuse = surface.get(width, height),
             )
+        surface.keep(bitmap)
         val result =
             glance.compose(context, DpSize.Unspecified) {
                 val modifier =
@@ -155,7 +172,7 @@ class RouteForecastDataType(private val context: Context, private val repo: Weat
                     contentScale = ContentScale.Fit,
                 )
             }
-        emitter.updateView(result.remoteViews)
+        return emitter.safeUpdate(result.remoteViews)
     }
 
     private fun routeColumns(
@@ -164,7 +181,11 @@ class RouteForecastDataType(private val context: Context, private val repo: Weat
         units: Units,
         count: Int,
     ): List<StripBitmapBuilder.Column> =
-        route.points.take(count).map { point ->
+        // Spread across the WHOLE remaining route: `take(count)` would show the nearest five of up
+        // to 25 samples, so a storm at +60 km — the thing this field exists to warn about — never
+        // reaches a column (DESIGN §3.4 spaces them +0/+18/+36/+54/+72 km).
+        RouteStripLayout.columnIndices(route.points.size, count).map { index ->
+            val point = route.points[index]
             StripBitmapBuilder.Column(
                 icon = WmoIcons.fieldForCode(point.sample.wmoCode, point.sample.isDay),
                 tempC = point.sample.temp,

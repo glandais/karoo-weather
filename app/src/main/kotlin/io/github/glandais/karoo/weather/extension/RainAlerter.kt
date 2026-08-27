@@ -52,8 +52,7 @@ class RainAlerter(
         val bucket = firstWetBucket(repo.rainBuckets(BUCKET_COUNT), nowSec) ?: return
         val minutes = minutesUntil(bucket.time, nowSec)
         if (!shouldAlert(minutes, lastAlertSec, nowSec, enabled, recording)) return
-        lastAlertSec = nowSec
-        karoo.dispatch(
+        val alert =
             InRideAlert(
                 id = ALERT_ID,
                 icon = R.drawable.ic_wmo_rain,
@@ -67,7 +66,11 @@ class RainAlerter(
                 backgroundColor = R.color.alert_bg,
                 textColor = R.color.alert_fg,
             )
-        )
+        // `dispatch` returns false, and shows nothing, while the system service is unbound (initial
+        // bind, or the SDK re-binding after a death). Consuming the hour-long cooldown for an alert
+        // the rider never saw would silence the next hour of rain; the 60 s tick simply retries.
+        val delivered = runCatching { karoo.dispatch(alert) }.getOrDefault(false)
+        if (delivered) lastAlertSec = nowSec
     }
 
     private fun ticker(): Flow<Unit> = flow {

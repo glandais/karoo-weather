@@ -1,5 +1,6 @@
 package io.github.glandais.karoo.weather.weather.openmeteo
 
+import io.github.glandais.karoo.weather.domain.ForecastFetch
 import io.github.glandais.karoo.weather.domain.GeoPoint
 import io.github.glandais.karoo.weather.domain.HttpGateway
 import io.github.glandais.karoo.weather.domain.HttpResult
@@ -24,7 +25,7 @@ class OpenMeteoProvider(private val http: HttpGateway, private val userAgent: St
 
     override val id: String = "open-meteo"
 
-    override suspend fun fetch(request: WeatherRequest): Result<List<LocationForecast>> {
+    override suspend fun fetch(request: WeatherRequest): Result<ForecastFetch> {
         val points = withinSizeBudget(request)
         if (points.isEmpty()) {
             return Result.failure(WeatherErrorException(WeatherError.Parse("no_points")))
@@ -42,13 +43,13 @@ class OpenMeteoProvider(private val http: HttpGateway, private val userAgent: St
                 return Result.failure(e)
             }
 
-        if (!request.includeNowcast) return Result.success(batch)
+        if (!request.includeNowcast) return Result.success(ForecastFetch(batch))
 
-        val detail =
-            fetchDetail(points.first(), request.forecastHours) ?: return Result.success(batch)
+        val detail = fetchDetail(points.first(), request.forecastHours)
+        val forecast = detail.forecast ?: return Result.success(ForecastFetch(batch, detail.error))
         val merged = batch.toMutableList()
-        merged[0] = OpenMeteoParser.mergeDetailInto(merged[0], detail)
-        return Result.success(merged.toList())
+        merged[0] = OpenMeteoParser.mergeDetailInto(merged[0], forecast)
+        return Result.success(ForecastFetch(merged.toList()))
     }
 
     /**
@@ -66,19 +67,25 @@ class OpenMeteoProvider(private val http: HttpGateway, private val userAgent: St
         return request.points.take(allowed)
     }
 
-    /** Request B. Returns null on any failure — the nowcast is optional by design. */
-    private suspend fun fetchDetail(point: GeoPoint, forecastHours: Int): LocationForecast? {
+    /**
+     * Request B. Never fatal — the nowcast is optional by design — but the error is CARRIED OUT
+     * rather than discarded, so the caller can honour a 429's `Retry-After` on B's own account.
+     */
+    private suspend fun fetchDetail(point: GeoPoint, forecastHours: Int): Detail {
         val body =
             when (val outcome = fetchBody(OpenMeteoUrl.hereDetail(point, forecastHours))) {
-                is Outcome.Failure -> return null
+                is Outcome.Failure -> return Detail(null, outcome.error)
                 is Outcome.Success -> outcome.body
             }
         return try {
-            OpenMeteoParser.parseDetail(body)
+            Detail(OpenMeteoParser.parseDetail(body), null)
         } catch (e: WeatherErrorException) {
-            null
+            Detail(null, e.error)
         }
     }
+
+    /** Request B's outcome: at most one of the two is non-null. */
+    private class Detail(val forecast: LocationForecast?, val error: WeatherError?)
 
     /** Performs one GET and normalises transport status, empty bodies and oversize bodies. */
     private suspend fun fetchBody(url: String): Outcome =

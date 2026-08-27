@@ -14,7 +14,6 @@ import io.hammerhead.karooext.KarooSystemService
 import io.hammerhead.karooext.models.ShowCustomStreamState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.onStart
 
@@ -23,6 +22,8 @@ internal data class FieldViewData(
     val snapshot: WeatherSnapshot,
     val visible: Boolean,
     val settings: WeatherSettings,
+    /** Effective repaint interval AT THIS TICK; never latched, see [FieldLoop.flow]. */
+    val refreshMs: Long,
 )
 
 /**
@@ -40,6 +41,11 @@ internal object FieldLoop {
      * `ActiveRidePage`, which only emits when the rider changes page, and `combine` produces
      * nothing until every source has emitted. Without the seed a field would stay blank until the
      * first page swipe.
+     *
+     * `repo.connected` is the fourth source purely so the repaint interval is RE-DERIVED once the
+     * system service connects: `hardwareType` — and with it `viewRefreshMs` — is null before that
+     * (karoo-headwind pitfall #1), and a view that read it once would keep the 3 s fallback for its
+     * whole life.
      */
     fun flow(
         karoo: KarooSystemService?,
@@ -48,14 +54,19 @@ internal object FieldLoop {
     ): Flow<FieldViewData> {
         val visible =
             karoo?.streamDataTypeVisible(dataTypeId)?.onStart { emit(true) } ?: flowOf(true)
-        return combine(repo.state, visible, repo.settings) { snapshot, isVisible, settings ->
-            FieldViewData(snapshot, isVisible, settings)
+        return combine(repo.state, visible, repo.settings, repo.connected) {
+            snapshot,
+            isVisible,
+            settings,
+            _ ->
+            FieldViewData(
+                snapshot = snapshot,
+                visible = isVisible,
+                settings = settings,
+                refreshMs = karoo?.viewRefreshMs(settings) ?: SLOW_REFRESH_MS,
+            )
         }
     }
-
-    /** Effective repaint interval; the slow side while the service is not connected yet. */
-    suspend fun refreshMs(karoo: KarooSystemService?, repo: WeatherRepository): Long =
-        karoo?.viewRefreshMs(repo.settings.first()) ?: SLOW_REFRESH_MS
 
     /**
      * The empty / loading / error message for a field, per DESIGN §6, or a cleared state when there

@@ -4,6 +4,7 @@ import android.content.Context
 import io.github.glandais.karoo.weather.data.WeatherRepository
 import io.github.glandais.karoo.weather.domain.DataTypeIds
 import io.github.glandais.karoo.weather.domain.WeatherSnapshot
+import io.github.glandais.karoo.weather.karoo.safeNext
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.Emitter
 import io.hammerhead.karooext.internal.ViewEmitter
@@ -51,7 +52,7 @@ abstract class NumericDataType(
         scope.launch {
             combine(repo.state, ticker()) { snapshot, now -> toStreamState(snapshot, now) }
                 .distinctUntilChanged()
-                .collect { state -> emitter.onNext(state) }
+                .collect { state -> if (!emitter.safeNext(state)) scope.cancel() }
         }
         emitter.setCancellable { scope.cancel() }
     }
@@ -61,7 +62,7 @@ abstract class NumericDataType(
      * no coroutine, so per ARCHITECTURE §4.3 it needs no `setCancellable`.
      */
     final override fun startView(context: Context, config: ViewConfig, emitter: ViewEmitter) {
-        formatDataTypeId?.let { emitter.onNext(UpdateNumericConfig(it)) }
+        formatDataTypeId?.let { emitter.safeNext(UpdateNumericConfig(it)) }
     }
 
     private fun toStreamState(snapshot: WeatherSnapshot, nowSec: Long): StreamState {

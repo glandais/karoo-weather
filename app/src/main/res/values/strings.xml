@@ -43,7 +43,9 @@
     <string name="unit_celsius">°C</string>
     <string name="unit_fahrenheit">°F</string>
     <string name="rain_starts_at">Rain at %1$s</string>
-    <string name="rain_total_2h">%1$s mm next 2 h</string>
+    <string name="rain_now">Raining now</string>
+    <!-- %2$s is the window the bars actually cover: 2 for the nowcast, 8 for the hourly fallback. -->
+    <string name="rain_total_window">%1$s mm next %2$s h</string>
     <string name="dist_ahead_km">+%1$s km</string>
     <string name="dist_ahead_mi">+%1$s mi</string>
     <string name="compass_n">N</string>

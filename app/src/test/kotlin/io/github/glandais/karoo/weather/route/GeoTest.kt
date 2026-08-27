@@ -3,6 +3,7 @@ package io.github.glandais.karoo.weather.route
 import io.github.glandais.karoo.weather.domain.GeoPoint
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -133,5 +134,32 @@ class GeoTest {
         val p = GeoPoint(45.1234, 5.6789)
         assertEquals(p, Geo.roundToGrid(p, 0.0))
         assertEquals(p, Geo.roundToGrid(p, -1.0))
+    }
+
+    @Test
+    fun `a sticky grid does not flip on jitter along a cell boundary`() {
+        val km = 1.0
+        // A point close to the boundary between two 1 km cells, and its neighbour a few metres on.
+        val a = GeoPoint(45.0045, 5.0)
+        val b = Geo.destination(a, 12.0, 0.0)
+        val cellA = Geo.roundToGrid(a, km)
+        val cellB = Geo.roundToGrid(b, km)
+
+        // Plain rounding is free to disagree about two points 12 m apart; sticky rounding is not.
+        assertEquals(cellA, Geo.roundToGridSticky(cellA, a, km))
+        assertEquals(cellA, Geo.roundToGridSticky(cellA, b, km))
+
+        // Far enough past the boundary and the cell does change.
+        val far = Geo.destination(a, 2_000.0, 0.0)
+        assertNotEquals(cellA, Geo.roundToGridSticky(cellA, far, km))
+
+        // With no previous cell it is exactly `roundToGrid`.
+        assertEquals(cellB, Geo.roundToGridSticky(null, b, km))
+    }
+
+    @Test
+    fun `a sticky grid is a no-op when rounding is disabled`() {
+        val p = GeoPoint(45.0, 5.0)
+        assertEquals(p, Geo.roundToGridSticky(GeoPoint(44.0, 4.0), p, 0.0))
     }
 }

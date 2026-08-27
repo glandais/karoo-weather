@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +30,7 @@ import io.github.glandais.karoo.weather.domain.Units
 import io.github.glandais.karoo.weather.domain.WeatherSnapshot
 import io.github.glandais.karoo.weather.ui.components.InfoState
 import io.github.glandais.karoo.weather.ui.components.RouteRow
+import io.github.glandais.karoo.weather.ui.components.StateBanner
 import io.github.glandais.karoo.weather.util.AppLiterals
 import io.github.glandais.karoo.weather.util.Distance
 import io.github.glandais.karoo.weather.util.Numbers
@@ -44,21 +46,42 @@ import io.github.glandais.karoo.weather.util.distanceAheadLabel
  * of this data a rider can read at a glance while stopped at a junction.
  */
 @Composable
-fun RouteScreen(snapshot: WeatherSnapshot, modifier: Modifier = Modifier) {
+fun RouteScreen(
+    snapshot: WeatherSnapshot,
+    nowSec: Long,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val route = snapshot.bundle?.route
 
     if (route == null || route.points.isEmpty()) {
-        Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            InfoState(
-                iconRes = R.drawable.ic_route,
-                title = stringResource(R.string.app_no_route_title),
-                body = stringResource(R.string.app_no_route_body),
-            )
+        // "No route loaded" is only true once nothing is in flight and nothing has failed: before
+        // the first fetch, and after one that errored, `bundle.route` is null for reasons that have
+        // nothing to do with the rider (DESIGN §6 keeps those four states apart).
+        Column(modifier = modifier.fillMaxSize()) {
+            if (snapshot.loading) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                )
+            }
+            StateBanner(snapshot = snapshot, nowSec = nowSec, onRetry = onRefresh)
+            if (!snapshot.loading && snapshot.error == null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    InfoState(
+                        iconRes = R.drawable.ic_route,
+                        title = stringResource(R.string.app_no_route_title),
+                        body = stringResource(R.string.app_no_route_body),
+                    )
+                }
+            }
         }
         return
     }
 
     LazyColumn(modifier = modifier.fillMaxSize()) {
+        item(key = "state") {
+            StateBanner(snapshot = snapshot, nowSec = nowSec, onRetry = onRefresh)
+        }
         item(key = "header") { RouteHeader(route = route, units = snapshot.units) }
         item(key = "header-divider") { HorizontalDivider() }
         items(items = route.points, key = { it.distanceAlong }) { point ->

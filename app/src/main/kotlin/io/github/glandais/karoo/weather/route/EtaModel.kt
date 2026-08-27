@@ -10,7 +10,10 @@ import kotlin.math.roundToLong
  * is derived from the elapsed time between samples: `alpha = 1 - exp(-dt / tau)`. A long gap
  * therefore snaps to the new value instead of dragging a stale one forward.
  *
- * Not thread-safe: feed it from one collector.
+ * Thread-safe: `WeatherRepository` feeds it from the SPEED collector, resets it from the navigation
+ * collector and reads it from the fetch worker, and those are three different `Dispatchers.IO`
+ * threads. Every method holds the instance monitor for its WHOLE critical section, because the race
+ * that matters is atomicity across the `ema`/`sampleCount` pair, not visibility of either alone.
  */
 class EtaModel(private val assumedSpeedMs: Double, private val tauSeconds: Double = 300.0) {
 
@@ -21,24 +24,28 @@ class EtaModel(private val assumedSpeedMs: Double, private val tauSeconds: Doubl
     /** Feed the SPEED stream. Samples below [MIN_SAMPLE_MS] are ignored (stopped at a light). */
     fun onSpeedSample(speedMs: Double, atEpochSec: Long) {
         if (!speedMs.isFinite() || speedMs < MIN_SAMPLE_MS) return
-        val previous = ema
-        val previousAt = lastAtSec
-        ema =
-            if (previous == null || previousAt == null) {
-                speedMs
-            } else {
-                val dt = (atEpochSec - previousAt).toDouble().coerceAtLeast(0.0)
-                val alpha = (1.0 - exp(-dt / tauSeconds.coerceAtLeast(1e-3))).coerceIn(0.0, 1.0)
-                previous + alpha * (speedMs - previous)
-            }
-        lastAtSec = atEpochSec
-        sampleCount++
+        synchronized(this) {
+            val previous = ema
+            val previousAt = lastAtSec
+            ema =
+                if (previous == null || previousAt == null) {
+                    speedMs
+                } else {
+                    val dt = (atEpochSec - previousAt).toDouble().coerceAtLeast(0.0)
+                    val alpha = (1.0 - exp(-dt / tauSeconds.coerceAtLeast(1e-3))).coerceIn(0.0, 1.0)
+                    previous + alpha * (speedMs - previous)
+                }
+            lastAtSec = atEpochSec
+            sampleCount++
+        }
     }
 
     fun reset() {
-        ema = null
-        lastAtSec = null
-        sampleCount = 0
+        synchronized(this) {
+            ema = null
+            lastAtSec = null
+            sampleCount = 0
+        }
     }
 
     /**
@@ -46,10 +53,12 @@ class EtaModel(private val assumedSpeedMs: Double, private val tauSeconds: Doubl
      * [assumedSpeedMs]. Never below [MIN_EFFECTIVE_MS], so an ETA can never divide by ~zero.
      */
     fun effectiveSpeedMs(useMeasured: Boolean): Double {
-        val measured = ema
         val chosen =
-            if (useMeasured && measured != null && sampleCount >= MIN_SAMPLES) measured
-            else assumedSpeedMs
+            synchronized(this) {
+                val measured = ema
+                if (useMeasured && measured != null && sampleCount >= MIN_SAMPLES) measured
+                else assumedSpeedMs
+            }
         return if (chosen.isFinite()) chosen.coerceAtLeast(MIN_EFFECTIVE_MS) else MIN_EFFECTIVE_MS
     }
 

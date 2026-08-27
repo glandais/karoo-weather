@@ -8,6 +8,7 @@ import io.github.glandais.karoo.weather.domain.RoutePointForecast
 import io.github.glandais.karoo.weather.domain.WeatherSettings
 import io.github.glandais.karoo.weather.domain.WeatherSnapshot
 import io.github.glandais.karoo.weather.karoo.consumerFlow
+import io.github.glandais.karoo.weather.karoo.safeNext
 import io.github.glandais.karoo.weather.weather.WmoCodes
 import io.github.glandais.karoo.weather.weather.WmoIcons
 import io.hammerhead.karooext.KarooSystemService
@@ -63,14 +64,23 @@ class WeatherMapLayer(
                 repo.settings,
             ) { snapshot: WeatherSnapshot, zoom: OnMapZoomLevel, settings: WeatherSettings ->
                 Render(
-                    points = snapshot.bundle?.route?.points.orEmpty(),
+                    // The cached bundle outlives the route it describes — it even survives a
+                    // reboot — so a finished route must stop being drawn the moment navigation
+                    // ends, not when the next fetch happens to succeed. Out of coverage that fetch
+                    // may never come, and the arrows would stay for the rest of the ride.
+                    points =
+                        if (snapshot.hasLiveRoute) snapshot.bundle?.route?.points.orEmpty()
+                        else emptyList(),
                     fetchedAt = snapshot.bundle?.fetchedAt,
                     spacing = symbolSpacingFor(zoom.zoomLevel),
                     enabled = settings.mapLayerEnabled,
                 )
             }
-            // Re-emit only when the bundle or the zoom BUCKET changes, never on a GPS tick.
-            .distinctUntilChangedBy { Triple(it.fetchedAt, it.spacing, it.enabled) }
+            // Re-emit only when the bundle, the zoom BUCKET or the route's liveness changes, never
+            // on a GPS tick. `fetchedAt` alone would swallow the emptying re-emission.
+            .distinctUntilChangedBy {
+                listOf(it.fetchedAt, it.spacing, it.enabled, it.points.isEmpty())
+            }
             .collect { render -> applyRender(emitter, render) }
     }
 
@@ -94,9 +104,9 @@ class WeatherMapLayer(
         val ids = symbols.map { it.id }
         val idSet = ids.toSet()
         val stale = shownIds.filterNot { it in idSet }
-        if (stale.isNotEmpty()) emitter.onNext(HideSymbols(stale))
+        if (stale.isNotEmpty() && !emitter.safeNext(HideSymbols(stale))) return
         // Re-emitting with the same ids updates the symbols in place.
-        emitter.onNext(ShowSymbols(symbols))
+        if (!emitter.safeNext(ShowSymbols(symbols))) return
         shownIds = ids
     }
 
@@ -104,7 +114,7 @@ class WeatherMapLayer(
         val stale = shownIds
         if (stale.isEmpty()) return
         shownIds = emptyList()
-        emitter.onNext(HideSymbols(stale))
+        emitter.safeNext(HideSymbols(stale))
     }
 
     private fun buildSymbols(selected: List<RoutePointForecast>): List<Symbol> {

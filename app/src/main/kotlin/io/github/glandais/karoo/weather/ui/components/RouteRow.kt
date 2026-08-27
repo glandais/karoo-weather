@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -27,6 +26,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.glandais.karoo.weather.R
 import io.github.glandais.karoo.weather.domain.RoutePointForecast
@@ -72,40 +72,52 @@ fun RouteRow(
                 .fillMaxWidth()
                 .heightIn(min = 56.dp)
                 .background(rowBackground)
-                .padding(horizontal = 16.dp, vertical = 4.dp),
+                .padding(horizontal = RouteRowMetrics.PADDING_DP.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(RouteRowMetrics.GAP_DP.dp),
     ) {
         val alpha = if (dimmed) 0.5f else 1f
 
-        Text(
-            text =
-                stringResource(
-                    distanceAheadLabel(units.distance),
-                    Distance.format(ahead, units.distance),
-                ),
-            style = MaterialTheme.typography.bodyMedium,
-            fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
-            modifier = Modifier.width(72.dp),
-        )
+        // Distance and ETA SHARE the leftover width instead of each carrying a fixed one: on the
+        // Karoo's 256 dp panel seven fixed children plus their gaps came to 312 dp, and Compose
+        // laid the last two — the arrow and the headwind figure, the only actionable content on
+        // the row — past the right edge, where they were clipped and never seen.
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(RouteRowMetrics.GAP_DP.dp),
+        ) {
+            Text(
+                text =
+                    stringResource(
+                        distanceAheadLabel(units.distance),
+                        Distance.format(ahead, units.distance),
+                    ),
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
 
-        Text(
-            text =
-                if (dimmed) stringResource(R.string.horizon_beyond)
-                else TimeFormat.clock(point.eta),
-            style = MaterialTheme.typography.bodyMedium,
-            fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
-            modifier = Modifier.width(56.dp),
-        )
+            Text(
+                text =
+                    if (dimmed) stringResource(R.string.horizon_beyond)
+                    else TimeFormat.clock(point.eta),
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
 
         Icon(
             painter =
                 painterResource(WmoIcons.fieldForCode(point.sample.wmoCode, point.sample.isDay)),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
-            modifier = Modifier.size(24.dp),
+            modifier = Modifier.size(RouteRowMetrics.ICON_DP.dp),
         )
 
         Text(
@@ -114,15 +126,14 @@ fun RouteRow(
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold,
             color = tempColor.copy(alpha = alpha),
-            modifier = Modifier.width(40.dp),
+            maxLines = 1,
+            modifier = Modifier.width(RouteRowMetrics.TEMP_DP.dp),
         )
-
-        Spacer(Modifier.weight(1f))
 
         WindArrow(
             angleDeg = point.relativeWindAngle.toFloat(),
             color = windColor.copy(alpha = alpha),
-            modifier = Modifier.size(24.dp),
+            modifier = Modifier.size(RouteRowMetrics.ARROW_DP.dp),
         )
 
         Text(
@@ -130,9 +141,33 @@ fun RouteRow(
             style = MaterialTheme.typography.bodyMedium,
             fontFamily = FontFamily.Monospace,
             color = windColor.copy(alpha = alpha),
-            modifier = Modifier.width(48.dp),
+            maxLines = 1,
+            modifier = Modifier.width(RouteRowMetrics.HEADWIND_DP.dp),
         )
     }
+}
+
+/**
+ * The row's fixed geometry, in dp, kept as plain numbers so the arithmetic can be unit tested.
+ *
+ * The Karoo panel measures 480 x 800 px at 300 dpi = **256 x 427 dp**, and the companion app runs
+ * on the device itself: [fixedWidthDp] must stay under [CONTENT_WIDTH_DP] or content is laid out
+ * past the right edge, with no ellipsis and no scroll to recover it.
+ */
+object RouteRowMetrics {
+    const val SCREEN_WIDTH_DP = 256
+    const val PADDING_DP = 12
+    const val GAP_DP = 4
+    const val ICON_DP = 20
+    const val TEMP_DP = 38
+    const val ARROW_DP = 20
+    const val HEADWIND_DP = 46
+
+    /** Width the row's children share. */
+    const val CONTENT_WIDTH_DP = SCREEN_WIDTH_DP - 2 * PADDING_DP
+
+    /** Everything that cannot shrink: four fixed children plus the four gaps between five. */
+    const val fixedWidthDp = ICON_DP + TEMP_DP + ARROW_DP + HEADWIND_DP + 4 * GAP_DP
 }
 
 /**

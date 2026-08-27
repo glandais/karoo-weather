@@ -132,6 +132,20 @@ fun <T> Flow<T>.throttle(periodMs: Long): Flow<T> =
     }
 
 /**
+ * [throttle] with the period taken from each emitted element.
+ *
+ * A view cannot latch its repaint interval once: `hardwareType` is null until the system service
+ * connects, and the rider can change `viewRefreshMs` while the field is on screen. Recomputing the
+ * window per tick is what makes both reach a running view.
+ */
+fun <T> Flow<T>.throttleEach(periodMs: (T) -> Long): Flow<T> =
+    conflate().transform {
+        emit(it)
+        val period = periodMs(it)
+        if (period > 0) delay(period)
+    }
+
+/**
  * Effective repaint interval.
  *
  * `hardwareType` is only valid AFTER `connect {}` fires (karoo-headwind pitfall #1), so null means

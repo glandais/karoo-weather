@@ -18,7 +18,9 @@ import io.github.glandais.karoo.weather.datatypes.views.WeatherNowView
 import io.github.glandais.karoo.weather.domain.DataTypeIds
 import io.github.glandais.karoo.weather.domain.WeatherSample
 import io.github.glandais.karoo.weather.domain.WeatherSnapshot
-import io.github.glandais.karoo.weather.karoo.throttle
+import io.github.glandais.karoo.weather.karoo.safeNext
+import io.github.glandais.karoo.weather.karoo.safeUpdate
+import io.github.glandais.karoo.weather.karoo.throttleEach
 import io.github.glandais.karoo.weather.weather.Interpolation
 import io.hammerhead.karooext.extension.DataTypeImpl
 import io.hammerhead.karooext.internal.Emitter
@@ -55,7 +57,7 @@ class WeatherNowDataType(private val context: Context, private val repo: Weather
         scope.launch {
             combine(repo.state, tick()) { snapshot, now -> streamState(snapshot, now) }
                 .distinctUntilChanged()
-                .collect { emitter.onNext(it) }
+                .collect { if (!emitter.safeNext(it)) scope.cancel() }
         }
         emitter.setCancellable { scope.cancel() }
     }
@@ -72,33 +74,39 @@ class WeatherNowDataType(private val context: Context, private val repo: Weather
         val night = FieldChrome.night(context)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+        // ONE coroutine: the chrome config and the cleared state must land BEFORE the loop's first
+        // custom state, and two coroutines on Dispatchers.IO give no such ordering — a lost race
+        // wipes the "No GPS" message and leaves the field blank with no explanation.
         scope.launch {
-            emitter.onNext(UpdateGraphicConfig(showHeader = true))
-            emitter.onNext(FieldChrome.clearState())
-            awaitCancellation()
-        }
+            if (!emitter.safeNext(UpdateGraphicConfig(showHeader = true))) return@launch
+            if (!emitter.safeNext(FieldChrome.clearState())) return@launch
 
-        scope.launch {
             if (config.preview) {
                 render(glance, context, config, PreviewData.snapshot, night, arrows, emitter)
                 awaitCancellation()
             }
-            val refreshMs = FieldLoop.refreshMs(repo.karooOrNull, repo)
-            FieldLoop.flow(repo.karooOrNull, repo, dataTypeId).throttle(refreshMs).collect { data ->
-                if (!data.visible) return@collect
-                emitter.onNext(FieldLoop.customState(context, data.snapshot, night))
-                render(glance, context, config, data.snapshot, night, arrows, emitter)
-            }
+            FieldLoop.flow(repo.karooOrNull, repo, dataTypeId)
+                .throttleEach { it.refreshMs }
+                .collect { data ->
+                    if (!data.visible) return@collect
+                    if (!emitter.safeNext(FieldLoop.customState(context, data.snapshot, night))) {
+                        scope.cancel()
+                        return@collect
+                    }
+                    if (!render(glance, context, config, data.snapshot, night, arrows, emitter)) {
+                        scope.cancel()
+                    }
+                }
         }
 
-        // Cancelling the scope, not the two jobs individually: it releases the parent
-        // SupervisorJob too, so nothing survives a stopView.
+        // Cancelling the scope releases the parent SupervisorJob too, so nothing survives stopView.
         emitter.setCancellable {
             scope.cancel()
             arrows.clear()
         }
     }
 
+    /** False when the host emitter is gone and this view must stop. */
     private suspend fun render(
         glance: GlanceRemoteViews,
         context: Context,
@@ -107,9 +115,11 @@ class WeatherNowDataType(private val context: Context, private val repo: Weather
         night: Boolean,
         arrows: ArrowBitmaps,
         emitter: ViewEmitter,
-    ) {
-        val now = System.currentTimeMillis() / 1000
-        val sample = sampleOf(snapshot, now) ?: return
+    ): Boolean {
+        // The page editor's preview must read off the SAME fixed clock PreviewData is pinned to,
+        // or its outlook strip filters every hour away and the largest layout advertises least.
+        val now = if (config.preview) PreviewData.BASE_TIME else System.currentTimeMillis() / 1000
+        val sample = sampleOf(snapshot, now) ?: return true
         val outlook = outlookOf(snapshot, now)
         val stale = snapshot.isStale(now)
         val result =
@@ -134,7 +144,7 @@ class WeatherNowDataType(private val context: Context, private val repo: Weather
                     )
                 }
             }
-        emitter.updateView(result.remoteViews)
+        return emitter.safeUpdate(result.remoteViews)
     }
 
     private fun streamState(snapshot: WeatherSnapshot, nowSec: Long): StreamState {

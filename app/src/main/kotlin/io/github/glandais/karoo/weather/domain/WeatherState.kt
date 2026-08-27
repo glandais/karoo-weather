@@ -14,6 +14,12 @@ data class WeatherSnapshot(
     val lastSuccessAt: Long? = null,
     /** False until the user has accepted the first-run consent dialog. */
     val consentAccepted: Boolean = false,
+    /**
+     * False once navigation has ended: [ForecastBundle.route] is cached (it even survives a reboot)
+     * and outlives the route it describes, so every consumer — the route strip and the map layer —
+     * must gate on this rather than on the bundle alone.
+     */
+    val hasLiveRoute: Boolean = true,
 ) {
     val hasData: Boolean
         get() = bundle != null

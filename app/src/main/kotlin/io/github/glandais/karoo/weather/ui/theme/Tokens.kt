@@ -34,8 +34,11 @@ object Wx {
     val tempCold = ColorPair(0xFF3E86C4, 0xFF7FC4FF)
     /** 10..20 °C — equals [fg] on purpose: mild weather needs no colour. */
     val tempMild = ColorPair(0xFF000000, 0xFFFFFFFF)
-    /** 20..28 °C */
-    val tempWarm = ColorPair(0xFFB07200, 0xFFFFC048)
+    /**
+     * 20..28 °C. The day value is darker than the amber it reads as: at 14 sp on the app's white
+     * surface it must clear the 4.5:1 WCAG AA ratio for normal text (#8A5A00 gives ~5.9:1).
+     */
+    val tempWarm = ColorPair(0xFF8A5A00, 0xFFFFC048)
     /** 28 °C */
     val tempHot = ColorPair(0xFFB3341F, 0xFFFF7A5C)
 
@@ -74,12 +77,13 @@ object Wx {
 
     /**
      * Rain intensity in mm per 15 minutes. Buckets: `< 0.1` none · `0.1..0.5` light · `0.5..2.0`
-     * med · `> 2.0` heavy (DESIGN §1.1). "None" is drawn in [fgMuted]: there is no rain colour for
-     * no rain.
+     * med · `> 2.0` heavy (DESIGN §1.1). "None" is drawn in [divider], not in [fgMuted]: against
+     * the field's true-black night background `fgMuted` is twice as bright as [rainLight], which
+     * would make a dry bucket the most prominent mark on the chart.
      */
     fun forRain(mmPerQuarterHour: Double): ColorPair =
         when {
-            mmPerQuarterHour < 0.1 -> fgMuted
+            mmPerQuarterHour < 0.1 -> divider
             mmPerQuarterHour < 0.5 -> rainLight
             mmPerQuarterHour <= 2.0 -> rainMed
             else -> rainHeavy

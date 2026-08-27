@@ -2,6 +2,7 @@ package io.github.glandais.karoo.weather.datatypes.views
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Typeface
@@ -38,7 +39,10 @@ object BarChartBuilder {
      *   would fall under the 10 sp floor of DESIGN §1.3.
      * @param showProbability draw the probability polyline. Callers pass `gridSize.second >= 30`.
      * @param dryLabel the word shown when nothing is forecast (`R.string.state_dry`).
-     * @param summary the pre-formatted "Rain at 14:20 · 1.4 mm next 2 h" line, or null.
+     * @param summary the pre-formatted "Rain at 14:20 · 1.4 mm next 2 h" line, or null. It is drawn
+     *   INDEPENDENTLY of [showLabels]: a narrow field drops the time axis but must keep the total,
+     *   or eight bars carry no scale at all (DESIGN §3.3's own (30,15) mock).
+     * @param reuse a bitmap of exactly `widthPx x heightPx` to redraw into, or null to allocate.
      */
     fun render(
         widthPx: Int,
@@ -49,10 +53,11 @@ object BarChartBuilder {
         showProbability: Boolean,
         dryLabel: String = "",
         summary: String? = null,
+        reuse: Bitmap? = null,
     ): Bitmap {
         val width = widthPx.coerceAtLeast(1)
         val height = heightPx.coerceAtLeast(1)
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bitmap = surface(reuse, width, height)
         val canvas = Canvas(bitmap)
 
         val fg = Wx.fg.pick(night)
@@ -68,7 +73,7 @@ object BarChartBuilder {
             }
 
         // Vertical budget: summary line at the bottom, then the axis, then the bars.
-        val summaryHeight = if (showLabels && summary != null) labelPx * 1.4f else 0f
+        val summaryHeight = if (summary != null) labelPx * 1.4f else 0f
         val axisHeight = if (showLabels) labelPx * 1.3f else 0f
         val chartTop = pad
         val chartBottom = height - pad - summaryHeight - axisHeight
@@ -130,13 +135,55 @@ object BarChartBuilder {
                 )
                 i += step
             }
-            if (summary != null) {
-                text.color = fg
-                canvas.drawText(summary, pad, height - pad, text)
-            }
+        }
+
+        if (summary != null) {
+            drawSummary(canvas, text, summary, fg, pad, width.toFloat(), height.toFloat())
         }
 
         return bitmap
+    }
+
+    /**
+     * The one prose line of the field, shrunk to the width it actually has.
+     *
+     * `Canvas.drawText` neither wraps nor ellipsises: at the (60,15) design target the full "Rain
+     * at 14:20 · 1.4 mm next 2 h" is wider than the bitmap and the tail is simply never drawn. The
+     * baseline also lifts by the descent, which a `height - pad` baseline would clip.
+     */
+    private fun drawSummary(
+        canvas: Canvas,
+        paint: Paint,
+        summary: String,
+        colour: Int,
+        pad: Float,
+        width: Float,
+        height: Float,
+    ) {
+        val size = paint.textSize
+        val align = paint.textAlign
+        val maxWidth = width - 2 * pad
+        val measured = paint.measureText(summary)
+        if (measured > maxWidth && measured > 0f) {
+            paint.textSize = (size * maxWidth / measured).coerceAtLeast(MIN_TEXT_PX)
+        }
+        // Still overflowing at the legibility floor: draw nothing rather than a cut-off sentence.
+        if (paint.measureText(summary) <= maxWidth) {
+            paint.color = colour
+            paint.textAlign = Paint.Align.LEFT
+            canvas.drawText(summary, pad, height - pad - paint.fontMetrics.descent, paint)
+        }
+        paint.textSize = size
+        paint.textAlign = align
+    }
+
+    /** [reuse] erased when it already has the right geometry, else a fresh bitmap. */
+    private fun surface(reuse: Bitmap?, width: Int, height: Int): Bitmap {
+        if (reuse != null && !reuse.isRecycled && reuse.width == width && reuse.height == height) {
+            reuse.eraseColor(Color.TRANSPARENT)
+            return reuse
+        }
+        return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     }
 
     /**
@@ -196,9 +243,36 @@ object BarChartBuilder {
     fun totalMm(buckets: List<PrecipBucket>): Double =
         (buckets.sumOf { it.mm } * 10.0).roundToInt() / 10.0
 
-    /** Start time of the first bucket at or above the wet threshold, epoch seconds, or null. */
-    fun firstWetTime(buckets: List<PrecipBucket>): Long? =
-        buckets.firstOrNull { mmPerQuarterHour(it) >= DRY_MM_PER_QUARTER }?.time
+    /** The span the [buckets] actually cover, seconds. Eight hourly buckets are eight hours. */
+    fun windowSeconds(buckets: List<PrecipBucket>): Long = buckets.sumOf {
+        if (it.durationSec > 0) it.durationSec.toLong() else QUARTER_HOUR_SEC.toLong()
+    }
+
+    /** When the rain starts, relative to [nowSec]. */
+    sealed interface WetStart {
+        /** The bucket CONTAINING `now` is wet: naming its start time would name the past. */
+        data object Now : WetStart
+
+        data class At(val timeSec: Long) : WetStart
+    }
+
+    /**
+     * The first wet bucket, or null when none is.
+     *
+     * `WeatherRepository.rainBuckets` deliberately starts one bucket BEFORE now so the bar the
+     * rider is inside is drawn; reporting that bucket's start as "Rain at 13:45" at 13:52 names a
+     * time already gone, so it is reported as [WetStart.Now] instead — the same distinction
+     * `RainAlerter.firstWetBucket` already makes.
+     */
+    fun firstWetTime(buckets: List<PrecipBucket>, nowSec: Long): WetStart? {
+        for (bucket in buckets.sortedBy { it.time }) {
+            val duration = if (bucket.durationSec > 0) bucket.durationSec else QUARTER_HOUR_SEC
+            if (bucket.time + duration <= nowSec) continue
+            if (mmPerQuarterHour(bucket) < DRY_MM_PER_QUARTER) continue
+            return if (bucket.time <= nowSec) WetStart.Now else WetStart.At(bucket.time)
+        }
+        return null
+    }
 
     private const val QUARTER_HOUR_SEC = 900
     private const val MIN_BAR_PX = 2f

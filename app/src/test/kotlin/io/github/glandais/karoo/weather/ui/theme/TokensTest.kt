@@ -86,8 +86,8 @@ class TokensTest {
 
     @Test
     fun forRainBoundaries() {
-        assertEquals(Wx.fgMuted, Wx.forRain(0.0))
-        assertEquals(Wx.fgMuted, Wx.forRain(0.099))
+        assertEquals(Wx.divider, Wx.forRain(0.0))
+        assertEquals(Wx.divider, Wx.forRain(0.099))
         assertEquals(Wx.rainLight, Wx.forRain(0.1))
         assertEquals(Wx.rainLight, Wx.forRain(0.499))
         assertEquals(Wx.rainMed, Wx.forRain(0.5))
@@ -98,7 +98,7 @@ class TokensTest {
 
     @Test
     fun forRainIsTotalAndMonotonic() {
-        val order = listOf(Wx.fgMuted, Wx.rainLight, Wx.rainMed, Wx.rainHeavy)
+        val order = listOf(Wx.divider, Wx.rainLight, Wx.rainMed, Wx.rainHeavy)
         var previous = 0
         var mm = 0.0
         while (mm <= 20.0) {

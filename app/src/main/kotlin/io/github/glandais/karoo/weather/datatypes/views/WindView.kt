@@ -73,7 +73,12 @@ fun WindView(
     val layout = WindLayout.of(config.gridSize)
     val relative =
         bearing?.let { RelativeWind.relativeAngle(it, sample.windDir) } ?: sample.windToDir
-    val headwind = RelativeWind.headwindComponent(relative, sample.windSpeed)
+    // Rotating the arrow into the meteorological frame when there is no bearing is intentional;
+    // COLOURING it from that frame is not — `headwindComponent` reads its angle as relative to
+    // travel, so an absolute bearing would paint a stationary rider's arrow tailwind green purely
+    // because the wind blows south. No travel direction, no headwind claim (as `clockColumns`).
+    val headwind =
+        bearing?.let { RelativeWind.headwindComponent(relative, sample.windSpeed) } ?: 0.0
     val tint = Wx.forHeadwind(headwind).pick(night)
     val sizePx = FieldChrome.arrowSizePx(config)
     val sizeDp = (sizePx / context.resources.displayMetrics.density).roundToInt().coerceAtLeast(16)

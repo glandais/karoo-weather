@@ -77,6 +77,24 @@ object Geo {
         return GeoPoint(lat, lon)
     }
 
+    /**
+     * [roundToGrid] with hysteresis: while the rider is still within [MARGIN] of the previous
+     * cell's own half-width, [previous] is kept.
+     *
+     * Without it, metre-scale GPS noise on a road that runs along a cell boundary flips the rounded
+     * position on every fix, and each flip publishes a refresh key that cancels the fetch the last
+     * one started.
+     */
+    fun roundToGridSticky(previous: GeoPoint?, p: GeoPoint, km: Double): GeoPoint {
+        val fresh = roundToGrid(p, km)
+        if (previous == null || km <= 0.0 || !km.isFinite() || previous == fresh) return fresh
+        val threshold = km * 1000.0 * 0.5 * (1.0 + MARGIN)
+        return if (distance(p, previous) <= threshold) previous else fresh
+    }
+
+    /** How far past a cell boundary the rider must be before the cell changes. */
+    const val MARGIN = 0.2
+
     /** Wraps any angle into [0, 360). */
     internal fun normalizeBearing(deg: Double): Double {
         val m = deg % 360.0
