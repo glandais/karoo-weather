@@ -127,7 +127,7 @@ class WindDataType(private val context: Context, private val repo: WeatherReposi
     private fun streamState(snapshot: WeatherSnapshot, nowSec: Long): StreamState {
         val sample = sampleOf(snapshot, nowSec) ?: return StreamState.NotAvailable
         return StreamState.Streaming(
-            DataPoint(dataTypeId, mapOf(DataType.Field.SINGLE to sample.windSpeed))
+            DataPoint(dataTypeId, mapOf(DataType.Field.SINGLE to sample.windSpeed)),
         )
     }
 

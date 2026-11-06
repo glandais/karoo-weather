@@ -30,7 +30,7 @@ class RouteForecastAssemblyTest {
                 Geo.destination(start, 10_000.0, 90.0),
                 Geo.destination(start, 20_000.0, 90.0),
                 Geo.destination(start, 30_000.0, 90.0),
-            )
+            ),
         )
 
     private val progress = 5_000.0
@@ -250,7 +250,7 @@ class RouteForecastAssemblyTest {
             1e-9,
         )
         assertTrue(
-            WeatherRepository.pathDistance(routeDistance, routeDistance, pathLength) <= pathLength
+            WeatherRepository.pathDistance(routeDistance, routeDistance, pathLength) <= pathLength,
         )
         // Degenerate inputs never escape the path.
         assertEquals(0.0, WeatherRepository.pathDistance(10.0, routeDistance, 0.0), 1e-9)

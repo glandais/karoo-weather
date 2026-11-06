@@ -131,7 +131,7 @@ class WeatherMapLayer(
                     // convention
                     // after the +180 flip, so the arrow points where the wind is going.
                     orientation = sample.windToDir.toFloat(),
-                )
+                ),
             )
             if (sample.precip >= RouteForecast.WET_THRESHOLD_MM) {
                 symbols.add(
@@ -141,7 +141,7 @@ class WeatherMapLayer(
                         lng = forecast.point.lon,
                         iconRes = WmoIcons.map(WmoCodes.category(sample.wmoCode), sample.isDay),
                         orientation = 0f,
-                    )
+                    ),
                 )
             }
         }

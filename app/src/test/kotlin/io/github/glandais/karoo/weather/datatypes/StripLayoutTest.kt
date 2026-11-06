@@ -91,7 +91,7 @@ class StripLayoutTest {
             BarChartBuilder.firstWetTime(
                 listOf(bucket(0.0, time = 900), bucket(0.05, time = 1_800)),
                 nowSec = 0L,
-            )
+            ),
         )
         assertEquals(
             BarChartBuilder.WetStart.At(2_700L),
@@ -109,7 +109,7 @@ class StripLayoutTest {
             BarChartBuilder.firstWetTime(
                 listOf(bucket(0.3, durationSec = 3600, time = 900)),
                 nowSec = 0L,
-            )
+            ),
         )
     }
 
@@ -137,7 +137,7 @@ class StripLayoutTest {
         assertEquals(
             8 * 3600L,
             BarChartBuilder.windowSeconds(
-                List(8) { bucket(0.0, durationSec = 3600, time = it * 3600L) }
+                List(8) { bucket(0.0, durationSec = 3600, time = it * 3600L) },
             ),
         )
     }

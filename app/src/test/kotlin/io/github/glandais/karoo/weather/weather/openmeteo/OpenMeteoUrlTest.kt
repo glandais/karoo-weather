@@ -120,19 +120,19 @@ class OpenMeteoUrlTest {
         for (n in 1 until 40) {
             assertTrue(
                 OpenMeteoUrl.estimateResponseBytes(n, 8, 12) <
-                    OpenMeteoUrl.estimateResponseBytes(n + 1, 8, 12)
+                    OpenMeteoUrl.estimateResponseBytes(n + 1, 8, 12),
             )
         }
         for (v in 1 until 12) {
             assertTrue(
                 OpenMeteoUrl.estimateResponseBytes(25, v, 12) <
-                    OpenMeteoUrl.estimateResponseBytes(25, v + 1, 12)
+                    OpenMeteoUrl.estimateResponseBytes(25, v + 1, 12),
             )
         }
         for (h in 1 until 24) {
             assertTrue(
                 OpenMeteoUrl.estimateResponseBytes(25, 8, h) <
-                    OpenMeteoUrl.estimateResponseBytes(25, 8, h + 1)
+                    OpenMeteoUrl.estimateResponseBytes(25, 8, h + 1),
             )
         }
     }
@@ -148,7 +148,7 @@ class OpenMeteoUrlTest {
         val max = OpenMeteoUrl.maxPointsWithin(OpenMeteoUrl.SIZE_BUDGET_BYTES, 8, 12)
         assertTrue(OpenMeteoUrl.estimateResponseBytes(max, 8, 12) <= OpenMeteoUrl.SIZE_BUDGET_BYTES)
         assertTrue(
-            OpenMeteoUrl.estimateResponseBytes(max + 1, 8, 12) > OpenMeteoUrl.SIZE_BUDGET_BYTES
+            OpenMeteoUrl.estimateResponseBytes(max + 1, 8, 12) > OpenMeteoUrl.SIZE_BUDGET_BYTES,
         )
         assertTrue("the 25-point budget must fit", max >= 25)
     }

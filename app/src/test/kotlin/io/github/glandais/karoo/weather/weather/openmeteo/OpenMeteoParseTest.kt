@@ -91,7 +91,7 @@ class OpenMeteoParseTest {
     fun `malformed json is a parse error`() {
         assertTrue(parseFailure { OpenMeteoParser.parseBatch("not json", 1) } is WeatherError.Parse)
         assertTrue(
-            parseFailure { OpenMeteoParser.parseDetail("{\"hourly\":") } is WeatherError.Parse
+            parseFailure { OpenMeteoParser.parseDetail("{\"hourly\":") } is WeatherError.Parse,
         )
     }
 
