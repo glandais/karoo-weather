@@ -20,7 +20,7 @@ class RoutePathTest {
                 GeoPoint(0.0, 0.01),
                 GeoPoint(0.0, 0.02),
                 GeoPoint(0.0, 0.03),
-            )
+            ),
         )
 
     /** Four points due north along the prime meridian, 0.01 deg apart. */
@@ -31,7 +31,7 @@ class RoutePathTest {
                 GeoPoint(0.01, 0.0),
                 GeoPoint(0.02, 0.0),
                 GeoPoint(0.03, 0.0),
-            )
+            ),
         )
 
     /**
@@ -45,7 +45,7 @@ class RoutePathTest {
                 GeoPoint(0.0, 0.02),
                 GeoPoint(0.01, 0.01),
                 GeoPoint(-0.01, 0.01),
-            )
+            ),
         )
 
     @Test

@@ -18,15 +18,17 @@ import io.hammerhead.karooext.internal.ViewEmitter
  * Both helpers return false instead. The caller's contract is to stop that one view's loop: a dead
  * binder fails identically on every subsequent tick, so retrying only hammers it.
  */
-fun <T> Emitter<T>.safeNext(value: T): Boolean =
-    runCatching { onNext(value) }
-        .onFailure { Log.w(LOG_TAG, "emitter is gone, stopping this view", it) }
-        .isSuccess
+fun <T> Emitter<T>.safeNext(value: T): Boolean = runCatching {
+    onNext(value)
+}
+    .onFailure { Log.w(LOG_TAG, "emitter is gone, stopping this view", it) }
+    .isSuccess
 
 /** [safeNext] for the view channel. */
-fun ViewEmitter.safeUpdate(views: RemoteViews): Boolean =
-    runCatching { updateView(views) }
-        .onFailure { Log.w(LOG_TAG, "view emitter is gone, stopping this view", it) }
-        .isSuccess
+fun ViewEmitter.safeUpdate(views: RemoteViews): Boolean = runCatching {
+    updateView(views)
+}
+    .onFailure { Log.w(LOG_TAG, "view emitter is gone, stopping this view", it) }
+    .isSuccess
 
 private const val LOG_TAG = "karoo-weather"

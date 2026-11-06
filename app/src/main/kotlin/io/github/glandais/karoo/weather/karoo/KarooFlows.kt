@@ -50,7 +50,7 @@ inline fun <reified T : KarooEvent> KarooSystemService.consumerFlow(): Flow<T> =
  * `OnHttpResponse.MakeHttpRequest`.
  */
 inline fun <reified T : KarooEvent> KarooSystemService.consumerFlowWithParams(
-    params: KarooEventParams
+    params: KarooEventParams,
 ): Flow<T> = callbackFlow {
     val listenerId = addConsumer<T>(params) { event: T -> trySendBlocking(event) }
     awaitClose { removeConsumer(listenerId) }

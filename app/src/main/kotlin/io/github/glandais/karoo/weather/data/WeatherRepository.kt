@@ -291,7 +291,7 @@ class WeatherRepository(
                             RoutePath.fromPolyline(state.routePolyline, state.reversed)
                                 ?: return setRoute(null),
                         routeDistance = state.routeDistance,
-                    )
+                    ),
                 )
             is OnNavigationState.NavigationState.NavigatingToDestination -> {
                 // The polyline is recomputed on every deviation, so accepting each one would fetch
@@ -314,7 +314,7 @@ class WeatherRepository(
                         name = state.destination.name.orEmpty(),
                         path = path,
                         routeDistance = path.length,
-                    )
+                    ),
                 )
             }
         }
@@ -540,7 +540,7 @@ class WeatherRepository(
                 here = forecasts.first(),
                 route = route,
                 provider = weatherProvider.id,
-            )
+            ),
         )
         cache.savePosition(rider)
         lastPositionSaveMs = System.currentTimeMillis()
@@ -744,7 +744,7 @@ class WeatherRepository(
                             routeBearing = path.bearingAt(pathProgress),
                             sample = sample,
                             beyondHorizon = false,
-                        )
+                        ),
                     )
                 }
             }
@@ -764,7 +764,7 @@ class WeatherRepository(
                         routeBearing = routeSample.routeBearing,
                         sample = sample,
                         beyondHorizon = horizonMarkerIndex != null && index == horizonMarkerIndex,
-                    )
+                    ),
                 )
             }
 

@@ -197,7 +197,7 @@ private fun ArrowInRing(
                         relativeAngle,
                         sizePx,
                         tint,
-                    )
+                    ),
                 ),
             contentDescription = null,
             modifier = GlanceModifier.size((sizeDp * 0.7f).roundToInt().dp),

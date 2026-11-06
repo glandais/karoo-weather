@@ -61,7 +61,7 @@ fun RouteScreen(
         Column(modifier = modifier.fillMaxSize()) {
             if (snapshot.loading) {
                 LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 )
             }
             StateBanner(snapshot = snapshot, nowSec = nowSec, onRetry = onRefresh)

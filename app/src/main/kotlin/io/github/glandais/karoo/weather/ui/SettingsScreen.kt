@@ -228,7 +228,7 @@ private fun AssumedSpeedRow(assumedSpeedKmh: Int, onCommit: (Int) -> Unit) {
                         onDone = {
                             commit()
                             focusManager.clearFocus()
-                        }
+                        },
                     ),
                 modifier =
                     Modifier.width(96.dp).onFocusChanged { focusState ->

@@ -344,7 +344,7 @@ private fun WindCell(
         Image(
             provider =
                 ImageProvider(
-                    arrows.rotated(context, R.drawable.ic_wind_arrow, relative, sizePx, tint)
+                    arrows.rotated(context, R.drawable.ic_wind_arrow, relative, sizePx, tint),
                 ),
             contentDescription = null,
             modifier = GlanceModifier.size(arrowDp.dp),
