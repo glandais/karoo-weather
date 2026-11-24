@@ -20,7 +20,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "io.github.glandais.karoo.weather"
-    compileSdk = 37
+    compileSdk { version = release(37) { minorApiLevel = 2 } }
 
     defaultConfig {
         applicationId = "io.github.glandais.karoo.weather"

@@ -72,7 +72,7 @@ Key invariants, in rough order of how expensive they are to violate:
   25 points (~31 KB) and `OpenMeteoProvider` trims the point list to the size budget before sending.
 * **Free APIs only.** Open-Meteo's free tier, no API key, ≤ 96 requests/day.
 * **`targetSdk = 32`** — the Karoo runs Android 12. Do not "fix" the `ExpiredTargetSdkVersion` lint
-  suppression. `compileSdk` is 37, `minSdk` 26.
+  suppression. `compileSdk` is 37.2 (Compose ≥ 1.13 requires ≥ 37.1), `minSdk` 26.
 * **Kotlin 2.4 / K2 compiler**, AGP 9.3 with its built-in Kotlin support (no `kotlin-android` plugin).
   Tests live in `app/src/test/kotlin` and are plain JUnit 4; `unitTests.isReturnDefaultValues = true` is set,
   so Android framework calls return defaults rather than throwing — keep tests off the framework anyway.
